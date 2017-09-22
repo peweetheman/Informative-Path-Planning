@@ -2,8 +2,8 @@ import numpy as np
 import scipy
 from scipy import interpolate
 import matplotlib.pyplot as plt
-
 from random import randint
+
 
 # -------------------------------------------------------------------------
 # TEMPERATURE FIELD (Ground truth)
@@ -23,10 +23,10 @@ z_field = f(x_field, y_field)
 #print(x_field.shape, y_field.shape, z_field.shape)
 
 # PLOT TEMPERATURE FIELD
-#plt.figure()
-#cp = plt.pcolor(x_field, y_field, z_field)
-#plt.colorbar(cp); plt.title('Temperature Field'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
-#plt.show('None')
+# plt.figure()
+# cp = plt.contourf(x_field, y_field, z_field)
+# plt.colorbar(cp); plt.title('Temperature Field'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
+# plt.show('None')
 
 # Streamingfield
 #x = np.linspace(-3, 3, 100)
@@ -43,17 +43,11 @@ lx = 31; ly = 31
 # Element width in x and y
 de = np.array([float(x_max - x_min)/(lx-1), float(y_max - y_min)/(ly-1)])
 print(de)
-x_grid = np.atleast_2d(np.linspace(0, 10, lx)).T
-y_grid = np.atleast_2d(np.linspace(0, 10, ly)).T
+x_grid = np.atleast_2d(np.linspace(x_min, x_max, lx)).T
+y_grid = np.atleast_2d(np.linspace(x_min, x_max, ly)).T
 
-# E_w = np.zeros(shape=(len(x_grid),len(y_grid)))
-# Q_W = np.zeros(shape=(len(x_grid),len(y_grid)))
 rho = 4.001
-#E_w = 10 * np.ones(shape=(lx,ly))
 mue_0 = 0 * np.ones(shape=(lx*ly,1))
-#Q_inv = rho * np.ones(shape=(lx,ly))
-#Q_inv = (1/rho) * np.ones(shape=(lx*ly,1))
-#print(field_info, field_info.shape)
 
 
 # -------------------------------------------------------------------------
@@ -77,49 +71,11 @@ def get_adjacent_cells(lx, ly):
 
     return infmat
 topology_inf = get_adjacent_cells(lx, ly)
-#print(type(topology_inf))
-#print(topology_inf)
-
-
-# Calculate initial GMRF - UNnecessary
-def GMRF_prior(x_grid, E, rho):
-    numrows = len(E_w)
-    numcols = len(E_w[0])
-    for i in range(0, numrows-1):
-        for j in range(0, numcols-1):
-            #print(i, j)
-
-            # Corner field values
-            if ((i - 1) < 0) & ((j - 1) < 0):
-                E_w[i, j] = 2 * (1 / rho) * (E.item((i + 1, j)) + E.item((i, j + 1)))
-            elif ((i - 1) < 0) & ((j + 1) > numcols):
-                E_w[i, j] = 2 * (1/rho) * (E.item((i+1, j)) + E.item((i, j-1)))
-            elif ((j - 1) < 0) & ((j + 1) > numrows):
-                E_w[i, j] = 2 * (1/rho) * (E.item((i-1, j)) + E.item((i+1, j)))
-            elif ((i + 1) > numcols) & ((j + 1) > numrows):
-                E_w[i, j] = 2 * (1/rho) * (E.item((i-1, j)) + E.item((i, j-1)))
-
-            # Side field values
-            elif (i-1) < 0:
-                E_w[i, j] = (4/3) * (1 / rho) * (E.item((i + 1, j)) + E.item((i, j - 1)) + E.item((i, j + 1)))
-            elif (j-1) < 0:
-                E_w[i, j] = (4/3) * (1 / rho) * (E.item((i - 1, j)) + E.item((i + 1, j)) + E.item((i, j + 1)))
-            elif (i+1) > numrows:
-                E_w[i, j] = (4/3) * (1 / rho) * (E.item((i - 1, j)) + E.item((i, j - 1)) + E.item((i, j + 1)))
-            elif (j+1) > numcols:
-                E_w[i, j] = (4/3) * (1 / rho) * (E.item((i - 1, j)) + E.item((i + 1, j)) + E.item((i, j - 1)))
-
-            # Inner field values
-            else:
-                E_w[i, j] = (1/rho) * (E.item((i-1, j)) + E.item((i+1, j)) + E.item((i, j-1)) + E.item((i, j+1)))
-    return E_w
-#GMRF_prior(x_grid, E_w, rho); #print(E_w)
-
-# Define Observation matrix that map grid vertices to continuous measurement locations
 
 
 # --------------------------------------------------------------------------------------------------------------
 # OBSERVATION MATRIX
+# Define Observation matrix that map grid vertices to continuous measurement locations
 def gmrf_prior(lx, ly, rho, infmat):
     # lx = Number of vertices columns (~x)
     # ly =  Number of vertices rows (~y)
@@ -144,17 +100,12 @@ def gmrf_prior(lx, ly, rho, infmat):
     return Q
 
 Q = gmrf_prior(lx, ly, rho, topology_inf)
+# CHECK Q
 #for i in range(0, (lx * ly)):
 #   if Q_inv[5, i] > 0:
 #      print(i)
-
 #print(Q_inv)
 
-# plt.figure()
-# cp = plt.contourf(np.linspace(-9, -1, num=lx, endpoint=True, retstep=False, dtype=None),
-#                   np.linspace(0, 7, num=ly, endpoint=True, retstep=False, dtype=None), E_w)
-# plt.colorbar(cp); plt.title('GMRF'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
-#plt.show()
 
 
 # --------------------------------------------------------------------------------------------------------------
@@ -176,9 +127,7 @@ def observation_matrix(s_obs, lx, ly, a, b, A_prev):
     n_ru = (ny * lx) + nx + 1
     n_lo = ((ny + 1) * lx) + nx
     n_ro = ((ny + 1) * lx) + nx + 1
-    #print('nx: ', nx, 'ny: ', ny,  'x_el: ', x_el, 'y_el: ', y_el)
-    #print('n_lu: ', n_lu, 'n_ru: ', n_ru,  'n_lo: ', n_lo, 'n_ro: ', n_ro)
-    #print('n_ru',n_ru,'n_lu',n_lu,'n_lo',n_lo)
+
     # Define shape functions, "a" is element width in x-direction
     A[0, n_lu] = (1 / (a * b)) * ((x_el - a/2) * (y_el - b/2))
     A[0, n_ru] = (-1 / (a * b)) * ((x_el + a/2) * (y_el - b/2))
@@ -208,12 +157,13 @@ def GMRF_posterior(mue_w, Q, A, sigz, z_obs):
     return {'mue_w2':mue_w2, 'Q_w2':Q_w}
 
 
-
-
+# --------------------------------------------------------------------------------------------------------------
+# RUN SIMULATION
 def run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_grid):
     n = 0
     A = np.array([])
     z_obs = np.array([])
+    z_vert = np.array([])
     plt.ion()
     plt.show()
 
@@ -259,7 +209,7 @@ def run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_g
         # #mue_0 = np.mean(z_obs) * np.ones(shape=(lx*ly,1))
 
         # Calculate 10 MEASUREMENTS ON GRID
-        ni = 13
+        ni = 6 # Min 2 for one measurement
         nj = 7
         for i in range(1, ni):
             for j in range(1, nj):
@@ -288,8 +238,6 @@ def run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_g
         out1 = GMRF_posterior(mue_0, Q, A, sigz, z_obs)
         mue_w = out1.get('mue_w2')
         Q_w2 = out1.get('Q_w2')
-        #print(mue_w.shape)
-        #print(Q.shape)
 
         # --------------------------------------------------------------------------------------------------------------
         # PLOT MEAN
@@ -304,9 +252,28 @@ def run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_g
         plt.colorbar(cp); plt.title('GMRF'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
         plt.scatter(xv, yv, marker='+',facecolors='k')
         plt.scatter(s_obs_plot[:,0], s_obs_plot[:,1], facecolors='none', edgecolors='r')
+        #plt.draw()
+        #plt.pause(0.001)
+
+        # PLOT prediction error variances
+        x_vertices = np.linspace(x_min, x_max, lx)
+        y_vertices = np.linspace(y_min, y_max, ly)
+        z_vertices = f(x_vertices, y_vertices)
+
+        e_var_plot = (np.subtract(z_vertices, mue_m))**2
+        #e_var = z_vertices
+        print(z_vert)
+
+        fig = plt.figure()
+        #contourf, pcolor
+        cp = plt.pcolor(np.linspace(x_min, x_max, num=lx, endpoint=True),
+                      np.linspace(y_min, y_max, num=ly, endpoint=True), e_var_plot,
+                     vmin=0, vmax=50)
+        plt.colorbar(cp); plt.title('Error Variance'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
+        plt.scatter(xv, yv, marker='+',facecolors='k')
+        plt.scatter(s_obs_plot[:,0], s_obs_plot[:,1], facecolors='none', edgecolors='r')
         plt.draw()
         plt.pause(100)
 
-        #print(s_obs_plot, s_obs_plot.shape)
 
 run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_grid)
