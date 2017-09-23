@@ -46,12 +46,12 @@ v = 1 + X - Y**2
 """
 
 # CREATE EXTENDED GMRF MESH
-lxf = 51; lyf = 51 # Number of GMRF vertices inside field in x and y
+lxf = 21; lyf = 21 # Number of GMRF vertices inside field in x and y
 de = np.array([float(x_max - x_min)/(lxf-1), float(y_max - y_min)/(lyf-1)]) # Element width in x and y
 
-dvx = 10; dvy = 10  # Number of extra GMRF vertices at border of field
+dvx = 3; dvy = 3  # Number of extra GMRF vertices at border of field
 xg_min = x_min - dvx * de[0]; xg_max = x_max + dvx * de[0]  # Min GMRF field value in x
-yg_min = y_min - dvy * de[01]; yg_max = y_max + dvy * de[1]
+yg_min = y_min - dvy * de[1]; yg_max = y_max + dvy * de[1]
 lx = lxf + 2*dvx; ly = lyf + 2*dvx # Total number of GMRF vertices in x and y
 print('xf_min: ', xg_min,',xf_max: ', xg_max, ',de: ', de)
 xf_grid = np.atleast_2d(np.linspace(x_min, x_max, lxf)).T
@@ -59,7 +59,7 @@ yf_grid = np.atleast_2d(np.linspace(y_min, y_max, lyf)).T
 x_grid = np.atleast_2d(np.linspace(xg_min, xg_max, lx)).T
 y_grid = np.atleast_2d(np.linspace(yg_min, yg_max, ly)).T
 print('x_grid.shape:', x_grid.shape, ', x_grid min. Value: ', x_grid[0], 'x_grid min. Value:',  x_grid[len(x_grid) - 1])
-rho = 4.001
+
 mue_0 = 0 * np.ones(shape=(lx*ly,1))
 
 
@@ -71,17 +71,28 @@ def get_adjacent_cells(lx, ly):
 
     for i in range(0, lx):
         for j in range(0, ly):
-            if (i+1) <= lx-1:  a = field_info[i+1, j]
+            # TORUS VERTICE TOPOLOGY
+            if (i+1) <= ly-1:  a = field_info[i+1, j]
+            else:  a = field_info[0, j] # Wrap vertice topology on Torus
+            if (j+1) <= lx-1:  b = field_info[i, j+1]
+            else:  b = field_info[i, 0]
+            if (i-1) >= 0:  c = field_info[i-1, j]
+            else:  c = field_info[len(field_info[0])-1, j]
+            if (j-1) >= 0:  d = field_info[i, j-1]
+            else:  d = field_info[i, len(field_info[1])-1]
+
+            # SIMPLE VERTICE TOPOLOGY
+            """
+            if (i+1) <= ly-1:  a = field_info[i+1, j]
             else:  a = -1
-            if (j+1) <= ly-1:  b = field_info[i, j+1]
+            if (j+1) <= lx-1:  b = field_info[i, j+1]
             else:  b = -1
             if (i-1) >= 0:  c = field_info[i-1, j]
             else:  c = -1
             if (j-1) >= 0:  d = field_info[i, j-1]
             else:  d = -1
-
+            """
             infmat[field_info[i, j], :] = np.array([field_info[i, j], a, b, c, d])
-
     return infmat
 topology_inf = get_adjacent_cells(lx, ly)
 
@@ -89,10 +100,12 @@ topology_inf = get_adjacent_cells(lx, ly)
 # --------------------------------------------------------------------------------------------------------------
 # OBSERVATION MATRIX
 # Define Observation matrix that map grid vertices to continuous measurement locations
-def gmrf_prior(lx, ly, rho, infmat):
+def gmrf_prior(lx, ly, infmat):
     # lx = Number of vertices columns (~x)
     # ly =  Number of vertices rows (~y)
     #mue = 10 * np.ones(shape=(lx * ly, 1))
+    rho = 4.001
+
     Q = np.zeros(shape=(lx * ly, lx * ly))
     for i in range(0, (lx * ly)):
         Q[i, i] = rho
@@ -112,7 +125,7 @@ def gmrf_prior(lx, ly, rho, infmat):
 
     return Q
 
-Q = gmrf_prior(lx, ly, rho, topology_inf)
+Q = gmrf_prior(lx, ly, topology_inf)
 # CHECK Q
 """for i in range(0, (lx * ly)):
     if Q_inv[5, i] > 0:
@@ -158,8 +171,9 @@ def observation_matrix(s_obs, lx, ly, a, b, A_prev):
 # --------------------------------------------------------------------------------------------------------------
 # GMRF POSTERIOR
 # Update GMRF with new observation
-sigz = 0.001
-def GMRF_posterior(mue_w, Q, A, sigz, z_obs):
+
+def GMRF_posterior(mue_w, Q, A, z_obs):
+    sigz = 0.001
     Q_w = Q + (1/(sigz**2)) * np.matrix.dot(A.T, A)     # Variance of latent field given new observations
     L_Q = np.linalg.cholesky(Q_w)
     Q_invAtZmue = np.linalg.solve(L_Q.T, np.linalg.solve(L_Q, np.matrix.dot(A.T, (z_obs - np.matrix.dot(A, mue_w)))))
@@ -169,7 +183,7 @@ def GMRF_posterior(mue_w, Q, A, sigz, z_obs):
 
 # --------------------------------------------------------------------------------------------------------------
 # RUN SIMULATION
-def run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_grid):
+def run_GMRF(lx, ly, de, mue_0, Q, x_min, x_max, y_min, y_max, x_grid, y_grid):
     n = 0
     A = np.array([])
     z_obs = np.array([])
@@ -220,9 +234,9 @@ def run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_g
 
         # Calculate 10 MEASUREMENTS ON GRID
         ni = 13 # Min 2 for one measurement
-        nj = 16
-        for i in range(1, ni):
-            for j in range(1, nj):
+        nj = 7
+        for i in range(0, ni):
+            for j in range(0, nj):
                 di = float(x_max - x_min) / ni
                 dj = float(y_max - y_min) / nj
                 #print('x_max - x_min',x_max - x_min)
@@ -245,51 +259,51 @@ def run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_g
 
         # --------------------------------------------------------------------------------------------------------------
         # GMRF POSTERIOR
-        out1 = GMRF_posterior(mue_0, Q, A, sigz, z_obs)
+        out1 = GMRF_posterior(mue_0, Q, A, z_obs)
         mue_w = out1.get('mue_w2')
         Q_w2 = out1.get('Q_w2')
 
         # --------------------------------------------------------------------------------------------------------------
         # PLOT MEAN
         xv, yv = np.meshgrid(xf_grid, yf_grid)
-
         mue_m = mue_w.reshape((lx, ly))
-        print('mue_m.shape: ', mue_m.shape, mue_m)
+
+
+        # PLOT GMRF
         fig = plt.figure()
         #contourf, pcolor
-        c1 = plt.contourf(np.linspace(x_min, x_max, num=lxf, endpoint=True),
-                      np.linspace(y_min, y_max, num=lyf, endpoint=True), mue_m[(dvx):(dvx+lxf), (dvy):(dvy+lyf)],
-                     vmin=-1, vmax=20)
+        c1 = plt.pcolor(np.linspace(x_min, x_max, num=lxf, endpoint=True),
+                      np.linspace(y_min, y_max, num=lyf, endpoint=True), mue_m[(dvx):(dvx+lxf),
+                    (dvy):(dvy+lyf)], vmin=-1, vmax=22)
         plt.colorbar(c1); plt.title('GMRF'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
         plt.scatter(xv, yv, marker='+',facecolors='k')
         plt.scatter(s_obs_plot[:,0], s_obs_plot[:,1], facecolors='none', edgecolors='r')
-        plt.draw()
+        #plt.draw()
         #plt.pause(0.001)
 
-        # PLOT prediction error variances
+        # PLOT prediction error
         x_vertices = np.linspace(xg_min, xg_max, lx)
         y_vertices = np.linspace(yg_min, yg_max, ly)
         z_vertices = f(x_vertices, y_vertices)
-
-        e_var_plot = (np.subtract(z_vertices, mue_m))**2
-        #e_var = z_vertices
-        print(z_vert)
+        e_var_plot = np.abs(np.subtract(z_vertices, mue_m))
 
         fig = plt.figure()
         #contourf, pcolor
-        c2 = plt.contourf(np.linspace(x_min, x_max, num=lxf, endpoint=True),
+        c2 = plt.pcolor(np.linspace(x_min, x_max, num=lxf, endpoint=True),
                       np.linspace(y_min, y_max, num=lyf, endpoint=True), e_var_plot[(dvx):(dvx+lxf), (dvy):(dvy+lyf)])
         plt.colorbar(c2); plt.title('Error Variance'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
-        plt.scatter(xv, yv, marker='+',facecolors='k')
-        plt.scatter(s_obs_plot[:,0], s_obs_plot[:,1], facecolors='none', edgecolors='r')
-        plt.draw()
+        #plt.scatter(xv, yv, marker='+',facecolors='k')
+        #plt.scatter(s_obs_plot[:,0], s_obs_plot[:,1], facecolors='none', edgecolors='r')
+        #plt.draw()
         #plt.pause(100)
 
+
+        # PLOT true field
         fig = plt.figure()
         #contourf, pcolor
-        c3 = plt.contourf(np.linspace(x_min, x_max, num=lxf, endpoint=True),
+        c3 = plt.pcolor(np.linspace(x_min, x_max, num=lxf, endpoint=True),
                       np.linspace(y_min, y_max, num=lyf, endpoint=True),
-                      z_vertices[(dvx):(dvx+lxf), (dvy):(dvy+lyf)], vmin=-1, vmax=20)
+                      z_vertices[(dvy):(dvy+lyf),(dvx):(dvx+lxf)], vmin=-1, vmax=22)
         plt.colorbar(c3); plt.title('True Field'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
         plt.scatter(xv, yv, marker='+',facecolors='k')
         plt.scatter(s_obs_plot[:,0], s_obs_plot[:,1], facecolors='none', edgecolors='r')
@@ -297,4 +311,6 @@ def run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_g
         plt.pause(100)
 
 
-run_GMRF(lx, ly, de, mue_0, Q, sigz, x_min, x_max, y_min, y_max, x_grid, y_grid)
+
+
+run_GMRF(lx, ly, de, mue_0, Q, x_min, x_max, y_min, y_max, x_grid, y_grid)
