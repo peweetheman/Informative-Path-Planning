@@ -58,13 +58,13 @@ v = 1 + X - Y**2
 
 # -------------------------------------------------------------------------
 # INITIALIZATION GMRF
-lxf = 100  # Number of x-axis GMRF vertices inside field
-lyf = 50
+lxf = 20  # Number of x-axis GMRF vertices inside field
+lyf = 10
 de = np.array([float(x_max - x_min)/(lxf-1), float(y_max - y_min)/(lyf-1)])
 # Element width in x and y
 
-dvx = 2  # Number of extra GMRF vertices at border of field
-dvy = 2
+dvx = 5  # Number of extra GMRF vertices at border of field
+dvy = 5
 xg_min = x_min - dvx * de[0]  # Min GMRF field value in x
 xg_max = x_max + dvx * de[0]
 yg_min = y_min - dvy * de[1]
@@ -139,12 +139,13 @@ for i in range(0, ly):
                                                         #               a1,c1            a1,d1               b1,d1           b1,c1
                                                                   field_info[a1,c1], field_info[a1,d1], field_info[b1,d1], field_info[b1,c1]])
 
+
 # DEFINE PRECISION MATRIX
 def gmrf_Q(kappa, alpha, infmat, car1=False):
     a = alpha + 4
     Q = np.zeros(shape=(lx * ly, lx * ly))
 
-    if (car1 == True):
+    if car1 == True:
         for i in range(0, (lx * ly)):
             Q[i, i] = a * kappa
             Q[i, infmat[i, 1:5].astype(int)] = -kappa
@@ -158,9 +159,21 @@ def gmrf_Q(kappa, alpha, infmat, car1=False):
         return Q
 
 # Calculate precision matrix
-kappa = 1
-alpha = 0.01
-Q = gmrf_Q(1, 0.0001, infmat, car1=False)
+# kappa = [4, 1, 0.25]  # Kappa for CAR(2) from paper "Efficient Bayesian spatial"
+# alpha = [0.0025, 0.01, 0.04]
+# kappa = [1, 1, 1]  # Kappa for CAR(1)
+# alpha = [0.1, 0.001, 0.00001]
+
+kappa = [4, 1, 0.25, 1, 1, 1]  # Kappa for CAR(1)
+alpha = [0.0025, 0.01, 0.04, 0.1, 0.001, 0.00001]
+
+Q_storage = np.zeros(shape=(lx * ly, lx * ly, len(kappa)))
+print(len(kappa))
+car_var = [False, False, False, True, True, True]
+
+for i in range(len(kappa)):
+    Q_storage[:, :, i] = gmrf_Q(kappa[i], alpha[i], infmat, car1=car_var[i])
+
 # Check Infmat and Q
 """
 print(ly, lx, ly*lx)
@@ -172,21 +185,30 @@ print(Q[24, :])
 print(np.linalg.matrix_rank(Q, tol=None))
 """
 # sampel from gmrf
-mue_Q = 20
-L_Q = np.linalg.cholesky(Q)
+mue_Q = 10
 z_I = np.random.standard_normal(size=lx * ly)
-v_Q = np.linalg.solve(L_Q.T, z_I)
-x_Q = mue_Q + v_Q
-x_Q = x_Q.reshape((ly, lx))
-print(x_Q.shape[1], x_Q.shape[0], lx, ly)
-fig, ax = plt.subplots(1)
-c1 = plt.pcolor(np.linspace(0, x_Q.shape[1], num=lx, endpoint=True),
-                np.linspace(0, x_Q.shape[0], num=ly, endpoint=True), x_Q)
-ax.axis('tight')
-plt.colorbar(c1)
-plt.title('GMRF sample')
-plt.xlabel('x (m)')
-plt.ylabel('y (m)')
+x_Q = np.zeros(shape=(ly, lx, len(kappa)))
+
+for i in range(0, Q_storage.shape[2]):
+    L_Q = np.linalg.cholesky(Q_storage[:, :, i])
+    v_Q = np.linalg.solve(L_Q.T, z_I)
+    x_Q_vec = mue_Q + v_Q
+    x_Q[:, :, i] = x_Q_vec.reshape((ly, lx))
+
+
+fig, ax = plt.subplots(3, 2)
+#ax = ax.ravel()
+k = 0
+for j in range(2):
+    for i in range(3):
+        cf = ax[i,j].pcolor(np.linspace(0, x_Q.shape[1], num=lx, endpoint=True),
+                        np.linspace(0, x_Q.shape[0], num=ly, endpoint=True), x_Q[:, :, k])
+        ax[i,j].axis('tight')
+        plt.colorbar(cf, ax=ax[i,j])
+        ax[i,j].set_title('GMRF sample, kappa: ' + str(kappa[k]) + ', alpha: ' + str(alpha[k]))
+    #plt.xlabel('x (m)')
+    #plt.ylabel('y (m)')
+        k += 1
 plt.show()
 #plt.pause(100)
 
