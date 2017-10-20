@@ -3,6 +3,8 @@ import scipy
 from scipy import interpolate
 import matplotlib.pyplot as plt
 from random import randint
+from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
 
 # Efficient-GMRF VERSION STATUS
 """
@@ -21,8 +23,7 @@ Variables:
 p := full latent field (z.T, betha.T)
 """
 
-
-"""Initialization"""
+"""Field initialization"""
 # -------------------------------------------------------------------------
 # Field size
 x_min = 0
@@ -31,12 +32,12 @@ y_min = 0
 y_max = 5
 
 # INITIALIZATION GMRF
-lxf = 30  # Number of x-axis GMRF vertices inside field
-lyf = 15
-de = np.array([float(x_max - x_min)/(lxf-1), float(y_max - y_min)/(lyf-1)]) # Element width in x and y
+lxf = 50  # Number of x-axis GMRF vertices inside field
+lyf = 25
+de = np.array([float(x_max - x_min)/(lxf-1), float(y_max - y_min)/(lyf-1)])  # Element width in x and y
 
-dvx = 3  # Number of extra GMRF vertices at border of field
-dvy = 3
+dvx = 5  # Number of extra GMRF vertices at border of field
+dvy = 5
 xg_min = x_min - dvx * de[0]  # Min GMRF field value in x
 xg_max = x_max + dvx * de[0]
 yg_min = y_min - dvy * de[1]
@@ -184,18 +185,21 @@ sample_from_GMRF(lx, ly, kappa, alpha, car_var)
 # -------------------------------------------------------------------------
 """TEMPERATURE FIELD (Ground truth)"""
 """Analytic field"""
-# z = np.array([[10, 10.625, 12.5, 15.625, 20],[5.625, 6.25, 8.125, 11.25, 15.625],[3, 3.125, 5., 12, 12.5],[5, 2, 3.125, 10, 10.625],[5, 15, 15, 5.625, 9]])
-#z = sample_from_GMRF(lx, ly)
+#z = np.array([[10, 10.625, 12.5, 15.625, 20],[5.625, 6.25, 8.125, 11.25, 15.625],[3, 3.125, 5., 12, 12.5],[5, 2, 3.125, 10, 10.625],[5, 15, 15, 5.625, 9]])
 #X = np.atleast_2d([0, 2, 4, 6, 9])  # Specifies column coordinates of field
 #Y = np.atleast_2d([0, 1, 3, 5, 10])  # Specifies row coordinates of field
+#x_field = np.arange(x_min, x_max, 1e-2)
+#y_field = np.arange(y_min, y_max, 1e-2)
 #f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
+#z_field = f(x_field, y_field)
 
 """Field from GMRF"""
 car_var = [False]  # Use car(1)?
-kappa_field = [1]  # Kappa for CAR(1)
-alpha_field = [0.01]
-f_x = 100
-f_y = 50
+kappa_field = [1]  # Kappa for Choi CAR(2) true field/ Solowjow et. al CAR(1)
+alpha_field = [0.01]  # Alpha for Choi CAR(2) true field/ Solowjow et. al CAR(1)
+f_x = 50  # Size for true field in x
+f_y = 25  # Size for true field in y
+
 z = sample_from_GMRF(f_x, f_y, kappa_field, alpha_field, car_var, 'False')  # GMRF as in paper
 X = np.linspace(x_min, x_max, num=f_x, endpoint=True)  # Specifies column coordinates of field
 Y = np.linspace(y_min, y_max, num=f_y, endpoint=True)  # Specifies row coordinates of field
@@ -214,55 +218,79 @@ plt.show()
 # ---------------------------------------------------------------------------------------------
 """SEQUENTIAL BAYESIAN PREDICTIVE ALGORITHM"""
 # Initialize vectors and matrices
-n = lx*ly  # Number of GMRF vertices
+carGMRF = [False]  # Use car(1)?
 p = 1  # Number of regression coefficients beta
+n = lx*ly  # Number of GMRF vertices
 b = np.zeros(shape=(n+p, 1)).astype(float)  # Canonical mean
-b[-1] = 20
-
+#b[-1] = 10  # Initial mean field value (?)
 u = np.zeros(shape=(n+p, 1)).astype(float)  # Observation topology vector
 c = 0.0  # Log-likelihood update vector
 
 """Define hyperparameter prior"""
-kappa_prior = np.array([0.0625 * (2 ** 0), 0.0625 * (2 ** 2), 0.0625 * (2 ** 4), 0.0625 * (2 ** 6), 0.0625 * (2 ** 8)]).astype(float)
-alpha_prior = np.array([0.000625 * (1 ** 2), 0.000625 * (2 ** 2), 0.000625 * (4 ** 2), 0.000625 * (8 ** 2), 0.000625 * (16 ** 2)]).astype(float)
-prob_theta_prior = 0.04
+# Choi paper
+#kappa_prior = np.array([0.0625 * (2 ** 0), 0.0625 * (2 ** 2), 0.0625 * (2 ** 4), 0.0625 * (2 ** 6), 0.0625 * (2 ** 8)]).astype(float)
+#alpha_prior = np.array([0.000625 * (1 ** 2), 0.000625 * (2 ** 2), 0.000625 * (4 ** 2), 0.000625 * (8 ** 2), 0.000625 * (16 ** 2)]).astype(float)
+
+# Choi Parameter (size 2)
+kappa_prior = np.array([0.0625 * (2 ** 2), 0.0625 * (2 ** 4)]).astype(float)
+alpha_prior = np.array([0.000625 * (2 ** 2), 0.000625 * (4 ** 2)]).astype(float)
+
+# Choi Parameter (size 3)
+#kappa_prior = np.array([0.0625 * (2 ** 2), 0.0625 * (2 ** 4), 0.0625 * (2 ** 6)]).astype(float)
+#alpha_prior = np.array([0.000625 * (2 ** 2), 0.000625 * (4 ** 2), 0.000625 * (8 ** 2)]).astype(float)
+
+# Solowjow Parameter for CAR(1) (size 1)
+#kappa_prior = np.array([1]).astype(float)
+#alpha_prior = np.array([0.01]).astype(float)
+
+# Same theta values (size 5)
+#kappa_prior = np.array([0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4)]).astype(float)
+#alpha_prior = np.array([0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2)]).astype(float)
+
+# Same theta values (size 10)
+#kappa_prior = np.array([0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4)]).astype(float)
+#alpha_prior = np.array([0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2)]).astype(float)
+
+# Extended Choi paper
+#kappa_prior = np.array([1000, 100, 10, 0.0625 * (2 ** 0), 0.0625 * (2 ** 2), 0.0625 * (2 ** 4), 0.0625 * (2 ** 6), 0.0625 * (2 ** 8), 0.0625 * (2 ** 9), 0.0625 * (2 ** 10)]).astype(float)
+#alpha_prior = np.array([0.000625 * (1 ** -1), 0.000625 * (1 ** 0), 0.000625 * (1 ** 1), 0.000625 * (1 ** 2), 0.000625 * (2 ** 2), 0.000625 * (4 ** 2), 0.000625 * (8 ** 2), 0.000625 * (16 ** 2), 0.000625 * (32 ** 2), 0.000625 * (64 ** 2), 0.000625 * (128 ** 2)]).astype(float)
 
 THETA = []  # Matrix containing all discrete hyperparameter combinations
 for i in range(0, len(alpha_prior)):
     for j in range(0, len(kappa_prior)):
         THETA.append([kappa_prior[j], alpha_prior[i]])
 THETA = np.array(THETA).T
-print(THETA[:, 12])
+l_TH = len(THETA[1])  # Number of hyperparameter pairs
+p_THETA = 1.0 / l_TH  # Prior probability for one theta
 
+"""Initialize mean regression functions"""
 F = np.ones(shape=(n, p)).astype(float)  # Mean regression functions
 
-"""Initialize precision matrix for different thetas"""
+"""Initialize matrices and vectors"""
 T = 1e-6 * np.ones(shape=(p, p)).astype(float)  # Precision matrix of the regression coefficients
 T_inv = np.linalg.inv(T)
 
-Q_eta = np.zeros(shape=(n, n, len(THETA[1]))).astype(float)
-Q_eta_inv = np.zeros(shape=(n, n, len(THETA[1]))).astype(float)
-Q_t = np.zeros(shape=(n+p, n+p, len(THETA[1]))).astype(float)
-Q_t_inv = np.zeros(shape=(n+p, n+p, len(THETA[1]))).astype(float)
-Q_t_inv2 = np.zeros(shape=(n+p, n+p, len(THETA[1]))).astype(float)
-L_Qt = np.zeros(shape=(n+p, n+p, len(THETA[1]))).astype(float)
+Q_eta = np.zeros(shape=(n, n, l_TH)).astype(float)
+Q_eta_inv = np.zeros(shape=(n, n, l_TH)).astype(float)
+Q_t = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
+Q_t_inv = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
+Q_t_inv2 = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
+L_Qt = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
 
-h_theta = np.zeros(shape=(n+p, len(THETA[1]))).astype(float)
-diag_Q_t_inv = np.zeros(shape=(n+p, len(THETA[1]))).astype(float)
-mue_theta = np.zeros(shape=(n+p, len(THETA[1]))).astype(float)
+h_theta = np.zeros(shape=(n+p, l_TH)).astype(float)
+diag_Q_t_inv = np.zeros(shape=(n+p, l_TH)).astype(float)
+mue_theta = np.zeros(shape=(n+p, l_TH)).astype(float)
 mue_x = np.zeros(shape=(n+p, 1)).astype(float)
-g_theta = np.zeros(shape=(len(THETA[1]), 1)).astype(float)
-log_phi_y = np.zeros(shape=(len(THETA[1]), 1)).astype(float)
-phi_theta = np.zeros(shape=(len(THETA[1]), 1)).astype(float)
+var_x = np.zeros(shape=(n+p, 1)).astype(float)
+g_theta = np.zeros(shape=(l_TH, 1)).astype(float)
+log_pi_y = np.zeros(shape=(l_TH, 1)).astype(float)
+pi_theta = np.zeros(shape=(l_TH, 1)).astype(float)
 
-
-"""Initialize Q_{x|eta}"""
-for jj in range(0, len(THETA[1])):
-    # _{GMRF values|eta}        kappa          alpha
-    Q_eta[:, :, jj] = gmrf_Q(lx, ly, THETA[0, jj], THETA[1, jj], car1=False)
-    Q_eta[:, :, jj] = gmrf_Q(lx, ly, THETA[0, jj], THETA[1, jj], car1=False)
-
-
+"""Initialize precision matrix for different thetas"""
+for jj in range(0, l_TH):
+    """Initialize Q_{x|eta}"""
+    # _{field values|eta}             kappa          alpha
+    Q_eta[:, :, jj] = gmrf_Q(lx, ly, THETA[0, jj], THETA[1, jj], car1=carGMRF)
     Q_eta_inv[:, :, jj] = np.linalg.inv(Q_eta[:, :, jj])
 
     """Q_{x|eta,y=/}"""
@@ -276,8 +304,6 @@ for jj in range(0, len(THETA[1])):
     #D = np.dot(-F.T, np.dot(Q_eta[:, :, jj], F)) + T
     #print(A.shape, B.shape)
     #print(C.shape, D.shape)
-
-    # Q_{x|eta,y=/}
     Q_t_inv[:, :, jj] = np.vstack((np.hstack((Q_eta_inv[:, :, jj] + np.dot(F, np.dot(T_inv, F.T)),  np.dot(F, T_inv))),
                                    np.hstack((np.dot(F, T_inv).T, T_inv))))
     diag_Q_t_inv[:, jj] = np.diagonal(Q_t_inv[:, :, jj])
@@ -286,6 +312,7 @@ for jj in range(0, len(THETA[1])):
 #----------------------------------
 """START SIMULATION"""
 sigma_w_squ = 0.2 ** 2  # Measurement variance
+#n_y = 4  # Number of measurements per update
 
 # Begin for-slope for all N observation at time t
 while True:
@@ -294,6 +321,7 @@ while True:
         break
 
     """Create discrete measurement"""
+    #for nm in range(n_m)
     nxf = randint(0, len(xf_grid) - 2)  # Measurement at random grid
     nyf = randint(0, len(yf_grid) - 2)
     s_obs = [yf_grid[nyf], xf_grid[nxf]]
@@ -316,63 +344,83 @@ while True:
     """Compute observation-dependent likelihood terms"""
     c = c - ((y_t ** 2) / (2 * sigma_w_squ))  # Likelihood term
 
-    for jj in range(0, len(THETA[1])):
+    for jj in range(0, l_TH):
         print(jj)
+        """Calculate observation precision (?)"""
         L_Qt[:, :, jj] = np.linalg.cholesky(Q_t[:, :, jj])
         v_h = np.linalg.solve(L_Qt[:, :, jj], u)
         h_theta[:, jj] = np.linalg.solve(L_Qt[:, :, jj].T, v_h).T
         #h_theta[:, jj] = np.linalg.solve(Q_t[:, :, jj], u).T
-        # Update Precision matrix
+
+        """Update Precision Matrix"""
         diag_Q_t_inv[:, jj] = np.subtract(diag_Q_t_inv[:, jj],  (np.multiply(h_theta[:, jj], h_theta[:, jj]) / (sigma_w_squ + np.dot(u.T, h_theta[:, jj]))))
         Q_t[:, :, jj] = Q_t[:, :, jj] + (1 / sigma_w_squ) * np.dot(u, u.T)
 
         g_theta[jj] = g_theta[jj] - (0.5 * np.log(1 + (1 / sigma_w_squ) * np.dot(u.T, h_theta[:, jj])))
     # End for-slope for all N observation at time t
 
-    """Compute conditional mean and Likelihood"""
-    for hh in range(0, len(THETA[1])):
+    for hh in range(0, l_TH):
         print(hh)
+        """Compute canonical mean"""
         L_Qt[:, :, hh] = np.linalg.cholesky(Q_t[:, :, hh])
         v_t = np.linalg.solve(L_Qt[:, :, hh], b)
         mue_theta[:, hh] = np.linalg.solve(L_Qt[:, :, hh].T, v_t).T
         #mue_theta[:, [hh]] = np.linalg.solve(Q_t[:, :, hh], b)
 
-        log_phi_y[hh] = c + g_theta[hh] + 0.5 * np.dot(b.T, mue_theta[:, hh]) # - (1 / 2) * np.log(2*np.pi*sigma_w_squ)  # Compute likelihood
+        """Compute Likelihood"""
+        log_pi_y[hh] = c + g_theta[hh] + 0.5 * np.dot(b.T, mue_theta[:, hh]) # - (1 / 2) * np.log(2*np.pi*sigma_w_squ)  # Compute likelihood
+        #print('0.5 * np.dot(b.T, mue_theta[:, hh])', 0.5 * np.dot(b.T, mue_theta[:, hh]))
+    #print('c', c)
+    #print('g_theta', g_theta)
 
-    # Scale likelihood
-    C1 = 1 / np.sum(log_phi_y - np.amin(log_phi_y))  # Proportionality constant
-    log_phi_y_scaled = C1 * (log_phi_y - np.amin(log_phi_y))
-    posterior = np.exp(log_phi_y_scaled) * prob_theta_prior
-    C2 = 1 / np.sum(posterior)   # Proportionality constant
+    """Scale likelihood and Posterior distribution (theta|y)"""
+    log_pi_exp = np.exp(log_pi_y - np.amax(log_pi_y))
+    posterior = (1 / np.sum(log_pi_exp)) * log_pi_exp * p_THETA
 
-    # Posterior distribution (theta|y)
-    #phi_theta = C2 * posterior  # Compute posterior distribution
-    phi_theta = np.zeros(shape=(25, 1))  # Posterior for DEBUGGING
-    phi_theta[12, 0] = 1
+    pi_theta = (1 / np.sum(posterior)) * posterior  # Compute posterior distribution
+    #pi_theta = posterior  # Compute posterior distribution
+    #pi_theta = np.zeros(shape=(25, 1))  # Posterior for DEBUGGING
+    #pi_theta[12, 0] = 1
 
     """Predictive mean and variance (x|y)"""
     for ji in range(0, n+p):
-        mue_x[ji] = np.dot(mue_theta[[ji], :], phi_theta)  # Predictive Mean
-
+        mue_x[ji] = np.dot(mue_theta[[ji], :], pi_theta)  # Predictive Mean
+        var_x[ji] = np.dot((diag_Q_t_inv[ji] + (np.subtract(mue_theta[ji, :], mue_x[ji] * np.ones(shape=(1, len(THETA[1])))) ** 2)),
+                           pi_theta)
 
     # --------------------------------------------
     """PLOT RESULT"""
     xv, yv = np.meshgrid(x_grid, y_grid)
     mue_x_plot = mue_x[0:(lx*ly)].reshape((ly, lx))
+    var_x_plot = var_x[0:(lx*ly)].reshape((ly, lx))
+
     xv_list = xv.reshape((lx*ly, 1))
     yv_list = yv.reshape((lx*ly, 1))
     labels = ['{0}'.format(i) for i in range(lx*ly)]  # Labels for annotating GMRF nodes
 
-    # PLOT GMRF
-    fig = plt.figure()
-    #contourf, pcolor
-    #c1 = plt.pcolor(np.linspace(x_min, x_max, num=lxf, endpoint=True),
-    #                np.linspace(y_min, y_max, num=lyf, endpoint=True), mue_x_plot[(dvx):(dvx+lxf),
-    #                (dvy):(dvy+lyf)].T, vmin=-1, vmax=22)
-    c1 = plt.contourf(np.linspace(yg_min, yg_max, num=ly, endpoint=True), np.linspace(xg_min, xg_max, num=lx, endpoint=True),
-                     mue_x_plot.T, vmin=-1, vmax=22)
-    plt.colorbar(c1); plt.title('GMRF'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
-    plt.scatter(yv, xv, marker='+', facecolors='k')
+    """Plot GMRF mean values"""
+    fig = plt.figure(figsize=(8, 3))
+    ax1 = fig.add_subplot(131)
+    c1 = ax1.contourf(np.linspace(xg_min, xg_max, num=lx, endpoint=True), np.linspace(yg_min, yg_max, num=ly, endpoint=True),
+                     mue_x_plot, vmin=-1, vmax=22)
+    plt.colorbar(c1)
+    plt.xlabel('x (m)')
+    plt.ylabel('y (m)')
+    plt.scatter(xv, yv, marker='+', facecolors='k')
+    plt.plot([x_min,x_min,x_max,x_max, x_min], [y_min,y_max,y_max,y_min, y_min], "c")
+    ax1.set_title('GMRF')
+
+    ax2 = fig.add_subplot(132)
+    c2 = ax2.contourf(np.linspace(xg_min, xg_max, num=lx, endpoint=True), np.linspace(yg_min, yg_max, num=ly, endpoint=True),
+                    var_x_plot)
+    """Plot GMRF variance"""
+    plt.colorbar(c2)
+    plt.xlabel('x (m)')
+    plt.ylabel('y (m)')
+    plt.scatter(xv, yv, marker='+', facecolors='k')
+    plt.plot([x_min,x_min,x_max,x_max, x_min], [y_min,y_max,y_max,y_min, y_min], "c")
+    ax2.set_title('Variance')
+
     """ # Label GMRF vertices
     for label, x, y in zip(labels, xv_list, yv_list):
         plt.annotate(
@@ -383,15 +431,30 @@ while True:
             #arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0')
             )
     """
-    plt.scatter(s_obs[0], s_obs[1], facecolors='none', edgecolors='r')
+
+    """Plot Hyperparameter estimate"""
+    _alpha_v, _kappa_v = np.meshgrid(alpha_prior, kappa_prior)
+    alpha_v, kappa_v = _alpha_v.ravel(), _kappa_v.ravel()
+    bottom = np.zeros_like(pi_theta)
+    _x = _y = np.arange(len(alpha_prior))
+    _xx, _yy = np.meshgrid(_x, _y)
+    x, y = _xx.ravel(), _yy.ravel()
+
+    ax3 = fig.add_subplot(133, projection='3d')
+    colors = plt.cm.jet(np.arange(len(x)) / float(np.arange(len(x)).max()))
+    #colors = plt.cm.jet(pi_theta.flatten() / float(pi_theta.max()))  # Color height dependent
+    ax3.bar3d(x, y, bottom, 1, 1, pi_theta,color=colors ,alpha=0.5)
+    ticksx = np.arange(0.5, len(alpha_prior)+0.5, 1)
+    plt.xticks(ticksx, alpha_prior)
+    plt.yticks(ticksx, kappa_prior)
+    ax3.set_xlabel('alpha')
+    ax3.set_ylabel('kappa')
+    ax3.set_zlabel('p(theta)')
+    ax3.set_title('Hyperparameter Posterior')
+
     plt.show()
     #plt.pause(0.001)
     #plt.draw
 
-    # DO NEXT
-    """
-    - In the theta for-slopes the variables must be calculated for each theta,same with mue_t and log_phi
-    - the predictive mean is a sum over all theta combinations
-"""
 
 
