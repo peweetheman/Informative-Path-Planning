@@ -6,8 +6,10 @@ from random import randint
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 
-# Efficient-GMRF VERSION STATUS
 """
+Efficient-GMRF 
+
+VERSION STATUS: 
 Goal: Combine Solowjow-Paper GMRF with Xu et al. GMRF
 
 Input:
@@ -23,8 +25,8 @@ Variables:
 p := full latent field (z.T, betha.T)
 """
 
-"""Field initialization"""
-# -------------------------------------------------------------------------
+"""#####################################################################################"""
+"""Initialize Experimental Setup"""
 # Field size
 x_min = 0
 x_max = 10
@@ -36,22 +38,24 @@ lxf = 50  # Number of x-axis GMRF vertices inside field
 lyf = 25
 de = np.array([float(x_max - x_min)/(lxf-1), float(y_max - y_min)/(lyf-1)])  # Element width in x and y
 
-dvx = 5  # Number of extra GMRF vertices at border of field
-dvy = 5
+dvx = 10  # Number of extra GMRF vertices at border of field
+dvy = 10
 xg_min = x_min - dvx * de[0]  # Min GMRF field value in x
 xg_max = x_max + dvx * de[0]
 yg_min = y_min - dvy * de[1]
 yg_max = y_max + dvy * de[1]
 
-lx = lxf + 2*dvx; ly = lyf + 2*dvy  # Total number of GMRF vertices in x and y
+lx = lxf + 2*dvx  # Total number of GMRF vertices in x
+ly = lyf + 2*dvy
+n = lx*ly  # Number of GMRF vertices
 xf_grid = np.atleast_2d(np.linspace(x_min, x_max, lxf)).T  # GMRF grid inside field
 yf_grid = np.atleast_2d(np.linspace(y_min, y_max, lyf)).T
 x_grid = np.atleast_2d(np.linspace(xg_min, xg_max, lx)).T  # Total GMRF grid
 y_grid = np.atleast_2d(np.linspace(yg_min, yg_max, ly)).T
 
 
-# ---------------------------------------------------------------------------------
-""" Define field topology of the vector field values"""
+"""#####################################################################################"""
+""" Define field topology of the vector field values and precision matrix"""
 def gmrf_Q(lx, ly, kappa, alpha, car1=False):
 
     field_info = np.arange(lx * ly).reshape((ly, lx))
@@ -107,9 +111,9 @@ def gmrf_Q(lx, ly, kappa, alpha, car1=False):
         return Q
 
 
-# ---------------------------------------------------------------------------------------------
+"""#####################################################################################"""
 """SAMPLE from GMRF"""
-def sample_from_GMRF(lx1, ly1, kappa, alpha, car_var, plot_gmrf):
+def sample_from_GMRF(lx1, ly1, kappa, alpha, car_var, plot_gmrf=False):
     # Calculate precision matrix
     Q_storage = np.zeros(shape=(lx1 * ly1, lx1 * ly1, len(kappa)))
 
@@ -180,56 +184,108 @@ kappa = [4, 1, 0.25, 1, 1, 1]  # Kappa for CAR(1) and CAR(2)
 alpha = [0.0025, 0.01, 0.04, 0.1, 0.001, 0.00001]
 
 sample_from_GMRF(lx, ly, kappa, alpha, car_var)
-"""  # Plot example gmrfs
+"""
 
-# -------------------------------------------------------------------------
+
+"""#####################################################################################"""
+"""Define continous observation vector"""
+def observation_vector(z_field, dvx, dvy, n, p, x_field, y_field, xf_grid, yf_grid, lx, ly, a1, b1, var, discrete_y=True):
+    # Define Observation vector that maps grid vertices to a continuous measurement location
+    # lx = Number of vertices columns (~x)
+    # ly =  Number of vertices rows (~y)
+    # a,b is the distance between two adjacent vertices in meters
+
+    if discrete_y == True:
+        """Create discrete measurement"""
+        nxf = randint(0, len(xf_grid) - 2)  # Measurement at random grid
+        nyf = randint(0, len(yf_grid) - 2)
+        s_obs = [yf_grid[nyf], xf_grid[nxf]]
+        sd_obs = [int((s_obs[0]) * 1e2), int((s_obs[1]) * 1e2)]
+        y1 = np.array(z_field[sd_obs[0], sd_obs[1]])
+        print('x/y in m,s_obs[0]', ' | ', s_obs[0], ' | ', s_obs[1], 'y1', y1)
+        nx = nxf + dvx  # Calculates the vertice column x-number at which the shape element starts.
+        ny = nyf + dvy  # Calculates the vertice row y-number at which the shape element starts.
+        kk = ny * lx + nx
+        u1 = np.zeros(shape=(n+p, 1)).astype(float)  # Observation topology vector
+        u1[kk] = 1
+        return u1, y1, s_obs
+    elif discrete_y == False:
+        """Create continuous measurement"""
+        nxf = randint(0, len(x_field) - 2)  # Measurement at random TRUE FIELD grid
+        nyf = randint(0, len(y_field) - 2)
+        s_obs = [y_field[nyf], x_field[nxf]]
+        sd_obs = [int((s_obs[0]) * 1e2), int((s_obs[1]) * 1e2)]
+        y1 = np.array(z_field[sd_obs[0], sd_obs[1]])
+        nx = int((s_obs[1] - xg_min) / a1)  # Calculates the vertice column x-number at which the shape element starts.
+        ny = int((s_obs[0] - yg_min) / b1)  # Calculates the vertice row y-number at which the shape element starts.
+
+        # Calculate position value in element coord-sys in meters
+        x_el = float(0.1 * (s_obs[1]/0.1 - int(s_obs[1]/0.1))) - a1/2
+        y_el = float(0.1 * (s_obs[0]/0.1 - int(s_obs[0]/0.1))) - b1/2
+        u1 = np.zeros(shape=(n+p, 1)).astype(float)
+        n_lu = (ny * lx) + nx
+        n_ru = (ny * lx) + nx + 1
+        n_lo = ((ny + 1) * lx) + nx
+        n_ro = ((ny + 1) * lx) + nx + 1
+
+        # Define shape functions, "a" is element width in x-direction
+        u1[n_lu] = (1 / (a1 * b1)) * ((x_el - a1/2) * (y_el - b1/2))
+        u1[n_ru] = (-1 / (a1 * b1)) * ((x_el + a1/2) * (y_el - b1/2))
+        u1[n_lo] = (-1 / (a1 * b1)) * ((x_el - a1/2) * (y_el + b1/2))
+        u1[n_ro] = (1 / (a1 * b1)) * ((x_el + a1/2) * (y_el + b1/2))
+        print('n_lu', n_lu, 'n_ru', n_ru, 'n_lo', n_lo, 'n_ro', n_ro )
+        return u1, y1, s_obs
+    else:
+        print('Invalid case definition for observation type')
+
+
+"""#####################################################################################"""
 """TEMPERATURE FIELD (Ground truth)"""
 """Analytic field"""
-#z = np.array([[10, 10.625, 12.5, 15.625, 20],[5.625, 6.25, 8.125, 11.25, 15.625],[3, 3.125, 5., 12, 12.5],[5, 2, 3.125, 10, 10.625],[5, 15, 15, 5.625, 9]])
-#X = np.atleast_2d([0, 2, 4, 6, 9])  # Specifies column coordinates of field
-#Y = np.atleast_2d([0, 1, 3, 5, 10])  # Specifies row coordinates of field
-#x_field = np.arange(x_min, x_max, 1e-2)
-#y_field = np.arange(y_min, y_max, 1e-2)
-#f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
-#z_field = f(x_field, y_field)
+# z = np.array([[10, 10.625, 12.5, 15.625, 20],[5.625, 6.25, 8.125, 11.25, 15.625],[3, 3.125, 5., 12, 12.5],[5, 2, 3.125, 10, 10.625],[5, 15, 15, 5.625, 9]])
+# X = np.atleast_2d([0, 2, 4, 6, 9])  # Specifies column coordinates of field
+# Y = np.atleast_2d([0, 1, 3, 5, 10])  # Specifies row coordinates of field
+# x_field = np.arange(x_min, x_max, 1e-2)
+# y_field = np.arange(y_min, y_max, 1e-2)
+# f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
+# z_field = f(x_field, y_field)
 
 """Field from GMRF"""
 car_var = [False]  # Use car(1)?
 kappa_field = [1]  # Kappa for Choi CAR(2) true field/ Solowjow et. al CAR(1)
 alpha_field = [0.01]  # Alpha for Choi CAR(2) true field/ Solowjow et. al CAR(1)
-f_x = 50  # Size for true field in x
-f_y = 25  # Size for true field in y
 
-z = sample_from_GMRF(f_x, f_y, kappa_field, alpha_field, car_var, 'False')  # GMRF as in paper
-X = np.linspace(x_min, x_max, num=f_x, endpoint=True)  # Specifies column coordinates of field
-Y = np.linspace(y_min, y_max, num=f_y, endpoint=True)  # Specifies row coordinates of field
+z = sample_from_GMRF(lx, ly, kappa_field, alpha_field, car_var, 'False')  # GMRF as in paper
+X = np.linspace(xg_min, xg_max, num=lx, endpoint=True)  # Specifies column coordinates of field
+Y = np.linspace(yg_min, yg_max, num=ly, endpoint=True)  # Specifies row coordinates of field
 f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
 
 x_field = np.arange(x_min, x_max, 1e-2)
 y_field = np.arange(y_min, y_max, 1e-2)
 z_field = f(x_field, y_field)
 
-plt.figure()
-cp = plt.contourf(x_field, y_field, z_field)
-plt.colorbar(cp); plt.title('Temperature Field'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
-plt.show()
 
 
-# ---------------------------------------------------------------------------------------------
+"""#####################################################################################"""
 """SEQUENTIAL BAYESIAN PREDICTIVE ALGORITHM"""
-# Initialize vectors and matrices
-carGMRF = [False]  # Use car(1)?
+
+"""Choose GMRF simulation parameters"""
+"""#######################################"""
+carGMRF = [True]  # Use car(1)? Default is car(2) from Choi et al
 p = 1  # Number of regression coefficients beta
-n = lx*ly  # Number of GMRF vertices
-b = np.zeros(shape=(n+p, 1)).astype(float)  # Canonical mean
-#b[-1] = 10  # Initial mean field value (?)
-u = np.zeros(shape=(n+p, 1)).astype(float)  # Observation topology vector
-c = 0.0  # Log-likelihood update vector
+F = np.ones(shape=(n, p)).astype(float)  # Mean regression functions
+T = 1e-6 * np.ones(shape=(p, p)).astype(float)  # Precision matrix of the regression coefficients
+sigma_w_squ = 0.2 ** 2  # Measurement variance
+"""#######################################"""
 
 """Define hyperparameter prior"""
 # Choi paper
 #kappa_prior = np.array([0.0625 * (2 ** 0), 0.0625 * (2 ** 2), 0.0625 * (2 ** 4), 0.0625 * (2 ** 6), 0.0625 * (2 ** 8)]).astype(float)
 #alpha_prior = np.array([0.000625 * (1 ** 2), 0.000625 * (2 ** 2), 0.000625 * (4 ** 2), 0.000625 * (8 ** 2), 0.000625 * (16 ** 2)]).astype(float)
+
+# Choi Parameter (size 1)
+#kappa_prior = np.array([0.0625 * (2 ** 4)]).astype(float)
+#alpha_prior = np.array([0.000625 * (4 ** 2)]).astype(float)
 
 # Choi Parameter (size 2)
 kappa_prior = np.array([0.0625 * (2 ** 2), 0.0625 * (2 ** 4)]).astype(float)
@@ -263,20 +319,15 @@ THETA = np.array(THETA).T
 l_TH = len(THETA[1])  # Number of hyperparameter pairs
 p_THETA = 1.0 / l_TH  # Prior probability for one theta
 
-"""Initialize mean regression functions"""
-F = np.ones(shape=(n, p)).astype(float)  # Mean regression functions
-
 """Initialize matrices and vectors"""
-T = 1e-6 * np.ones(shape=(p, p)).astype(float)  # Precision matrix of the regression coefficients
-T_inv = np.linalg.inv(T)
-
+T_inv = np.linalg.inv(T)  # Inverse of the Precision matrix of the regression coefficients
+b = np.zeros(shape=(n+p, 1)).astype(float)  # Canonical mean
+c = 0.0  # Log-likelihood update vector
 Q_eta = np.zeros(shape=(n, n, l_TH)).astype(float)
 Q_eta_inv = np.zeros(shape=(n, n, l_TH)).astype(float)
 Q_t = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
 Q_t_inv = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
-Q_t_inv2 = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
 L_Qt = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
-
 h_theta = np.zeros(shape=(n+p, l_TH)).astype(float)
 diag_Q_t_inv = np.zeros(shape=(n+p, l_TH)).astype(float)
 mue_theta = np.zeros(shape=(n+p, l_TH)).astype(float)
@@ -297,46 +348,23 @@ for jj in range(0, l_TH):
     Q_t[:, :, jj] = np.vstack((np.hstack((Q_eta[:, :, jj],  np.dot(-1 * Q_eta[:, :, jj], F))),
                                np.hstack((np.dot(-1 * F.T, Q_eta[:, :, jj]),
                                           np.dot(F.T, np.dot(Q_eta[:, :, jj], F)) + T))))
-    # Check Q_eta
-    #A = Q_eta[:, :, jj]
-    #B = np.dot(-Q_eta[:, :, jj], F)
-    #C = np.dot(-F.T, Q_eta[:, :, jj])
-    #D = np.dot(-F.T, np.dot(Q_eta[:, :, jj], F)) + T
-    #print(A.shape, B.shape)
-    #print(C.shape, D.shape)
     Q_t_inv[:, :, jj] = np.vstack((np.hstack((Q_eta_inv[:, :, jj] + np.dot(F, np.dot(T_inv, F.T)),  np.dot(F, T_inv))),
                                    np.hstack((np.dot(F, T_inv).T, T_inv))))
     diag_Q_t_inv[:, jj] = np.diagonal(Q_t_inv[:, :, jj])
 
 
-#----------------------------------
+"""#####################################################################################"""
 """START SIMULATION"""
-sigma_w_squ = 0.2 ** 2  # Measurement variance
-#n_y = 4  # Number of measurements per update
-
 # Begin for-slope for all N observation at time t
 while True:
-    x = raw_input("Press [enter] to continue or [q] to quit")
-    if x == 'q':
-        break
+    #x = raw_input("Press [enter] to continue or [q] to quit")
+    #if x == 'q':
+        #break
 
-    """Create discrete measurement"""
-    #for nm in range(n_m)
-    nxf = randint(0, len(xf_grid) - 2)  # Measurement at random grid
-    nyf = randint(0, len(yf_grid) - 2)
-    s_obs = [yf_grid[nyf], xf_grid[nxf]]
-    sd_obs = [int((s_obs[0]) * 1e2), int((s_obs[1]) * 1e2)]
-    y_t = np.array(z_field[sd_obs[0], sd_obs[1]])
-    print('x/y in m,s_obs[0]', ' | ', s_obs[1], 'y_t', y_t)
-    nx = nxf + dvx  # Calculates the vertice column x-number at which the shape element starts.
-    ny = nyf + dvy  # Calculates the vertice row y-number at which the shape element starts.
-    kk = ny * lx + nx
-    #print('nxf', nxf, 'nyf', nyf, 's_obs', s_obs, 'sd_obs', sd_obs, 'kk', kk)
-    #print('Before Update Q_t[kk, kk, jj]', Q_t[kk, kk, jj])
-
-    """Set observation index location"""
-    u = np.zeros(shape=(n + p, 1)).astype(float)  # Observation topology vector
-    u[kk] = 1
+    """Compute observation vector and observation"""
+    u, y_t, s_obs = observation_vector(z_field, dvx, dvy, n, p, x_field, y_field,
+                                xf_grid, yf_grid, lx, ly, de[0], de[1], var_x,
+                                discrete_y=False)
 
     """Update canonical mean"""
     b = b + (y_t/sigma_w_squ) * u
@@ -350,7 +378,6 @@ while True:
         L_Qt[:, :, jj] = np.linalg.cholesky(Q_t[:, :, jj])
         v_h = np.linalg.solve(L_Qt[:, :, jj], u)
         h_theta[:, jj] = np.linalg.solve(L_Qt[:, :, jj].T, v_h).T
-        #h_theta[:, jj] = np.linalg.solve(Q_t[:, :, jj], u).T
 
         """Update Precision Matrix"""
         diag_Q_t_inv[:, jj] = np.subtract(diag_Q_t_inv[:, jj],  (np.multiply(h_theta[:, jj], h_theta[:, jj]) / (sigma_w_squ + np.dot(u.T, h_theta[:, jj]))))
@@ -365,20 +392,15 @@ while True:
         L_Qt[:, :, hh] = np.linalg.cholesky(Q_t[:, :, hh])
         v_t = np.linalg.solve(L_Qt[:, :, hh], b)
         mue_theta[:, hh] = np.linalg.solve(L_Qt[:, :, hh].T, v_t).T
-        #mue_theta[:, [hh]] = np.linalg.solve(Q_t[:, :, hh], b)
 
         """Compute Likelihood"""
         log_pi_y[hh] = c + g_theta[hh] + 0.5 * np.dot(b.T, mue_theta[:, hh]) # - (1 / 2) * np.log(2*np.pi*sigma_w_squ)  # Compute likelihood
-        #print('0.5 * np.dot(b.T, mue_theta[:, hh])', 0.5 * np.dot(b.T, mue_theta[:, hh]))
-    #print('c', c)
-    #print('g_theta', g_theta)
 
     """Scale likelihood and Posterior distribution (theta|y)"""
     log_pi_exp = np.exp(log_pi_y - np.amax(log_pi_y))
     posterior = (1 / np.sum(log_pi_exp)) * log_pi_exp * p_THETA
 
     pi_theta = (1 / np.sum(posterior)) * posterior  # Compute posterior distribution
-    #pi_theta = posterior  # Compute posterior distribution
     #pi_theta = np.zeros(shape=(25, 1))  # Posterior for DEBUGGING
     #pi_theta[12, 0] = 1
 
@@ -388,49 +410,103 @@ while True:
         var_x[ji] = np.dot((diag_Q_t_inv[ji] + (np.subtract(mue_theta[ji, :], mue_x[ji] * np.ones(shape=(1, len(THETA[1])))) ** 2)),
                            pi_theta)
 
-    # --------------------------------------------
-    """PLOT RESULT"""
+
+
+    """#####################################################################################"""
+    """PLOT RESULTS"""
+    # Transform mean and variance into matrix for scatter
     xv, yv = np.meshgrid(x_grid, y_grid)
     mue_x_plot = mue_x[0:(lx*ly)].reshape((ly, lx))
     var_x_plot = var_x[0:(lx*ly)].reshape((ly, lx))
 
+    # Create vectors for enumerating the GMRF nodes
     xv_list = xv.reshape((lx*ly, 1))
     yv_list = yv.reshape((lx*ly, 1))
     labels = ['{0}'.format(i) for i in range(lx*ly)]  # Labels for annotating GMRF nodes
 
-    """Plot GMRF mean values"""
-    fig = plt.figure(figsize=(8, 3))
-    ax1 = fig.add_subplot(131)
-    c1 = ax1.contourf(np.linspace(xg_min, xg_max, num=lx, endpoint=True), np.linspace(yg_min, yg_max, num=ly, endpoint=True),
-                     mue_x_plot, vmin=-1, vmax=22)
-    plt.colorbar(c1)
+    """Define plot parameters"""
+    """#######################################"""
+    vmin = np.amin(z_field)-0.5  # Minimum mean and true field value?
+    vmax = np.amax(z_field)+0.5
+    levels = np.linspace(vmin, vmax, 20)  # How many contour levels for mean and true field?
+    levels2 = np.linspace(0, 8, 20)  # How many contour levels for variance?
+    PlotField = False  # Plot Torus sides of GMRF?
+    LabelVertices = True  # Label all vertices by number? Only for >PlotField = True<
+    """#######################################"""
+
+
+    fig1 = plt.figure(figsize=(8, 3))
+
+    """Plot True Field"""
+    ax0 = fig1.add_subplot(221)
+    cp = plt.contourf(x_field, y_field, z_field, vmin=vmin, vmax=vmax, levels=levels)
+    plt.colorbar(cp)
+    plt.plot(s_obs[1], s_obs[0], color='r', marker='o')
+    plt.title('True Field')
     plt.xlabel('x (m)')
     plt.ylabel('y (m)')
-    plt.scatter(xv, yv, marker='+', facecolors='k')
-    plt.plot([x_min,x_min,x_max,x_max, x_min], [y_min,y_max,y_max,y_min, y_min], "c")
-    ax1.set_title('GMRF')
 
-    ax2 = fig.add_subplot(132)
-    c2 = ax2.contourf(np.linspace(xg_min, xg_max, num=lx, endpoint=True), np.linspace(yg_min, yg_max, num=ly, endpoint=True),
-                    var_x_plot)
-    """Plot GMRF variance"""
-    plt.colorbar(c2)
-    plt.xlabel('x (m)')
-    plt.ylabel('y (m)')
-    plt.scatter(xv, yv, marker='+', facecolors='k')
-    plt.plot([x_min,x_min,x_max,x_max, x_min], [y_min,y_max,y_max,y_min, y_min], "c")
-    ax2.set_title('Variance')
+    if PlotField == True:
+        """Plot GMRF mean"""
+        ax1 = fig1.add_subplot(222)
+        c1 = ax1.contourf(np.linspace(xg_min, xg_max, num=lx, endpoint=True), np.linspace(yg_min, yg_max, num=ly, endpoint=True),
+                         mue_x_plot, vmin=vmin, vmax=vmax, levels=levels)
+        plt.colorbar(c1)
+        plt.xlabel('x (m)')
+        plt.ylabel('y (m)')
+        plt.scatter(xv, yv, marker='+', facecolors='dimgrey')
+        plt.plot([x_min, x_min, x_max, x_max, x_min], [y_min, y_max, y_max, y_min, y_min], "k")
+        plt.plot(s_obs[1], s_obs[0], color='r', marker='o')
+        ax1.set_title('GMRF Mean')
 
-    """ # Label GMRF vertices
-    for label, x, y in zip(labels, xv_list, yv_list):
-        plt.annotate(
-            label,
-            xy=(x, y), xytext=(-2, 2),
-            textcoords='offset points', ha='center', va='center',
-            #bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
-            #arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0')
-            )
-    """
+        if LabelVertices == True:
+            # Label GMRF vertices
+            for label, x, y in zip(labels, xv_list, yv_list):
+                plt.annotate(
+                    label,
+                    xy=(x, y), xytext=(-2, 2),
+                    textcoords='offset points', ha='center', va='center',
+                    #bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+                    #arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0')
+                    )
+
+
+        """Plot GMRF variance"""
+        ax2 = fig1.add_subplot(223)
+        c2 = ax2.contourf(np.linspace(xg_min, xg_max, num=lx, endpoint=True), np.linspace(yg_min, yg_max, num=ly, endpoint=True),
+                        var_x_plot, vmin=0)
+        plt.colorbar(c2)
+        plt.xlabel('x (m)')
+        plt.ylabel('y (m)')
+        plt.scatter(xv, yv, marker='+', facecolors='dimgrey')
+        plt.plot([x_min, x_min, x_max, x_max, x_min], [y_min, y_max, y_max, y_min, y_min], "k")
+        plt.plot(s_obs[1], s_obs[0], color='r', marker='o')
+        ax2.set_title('GMRF Variance')
+    else:
+        """Plot GMRF mean"""
+        ax1 = fig1.add_subplot(222)
+        print(lxf, var_x_plot[dvy:(lyf+dvy), dvx:(lxf+dvx)].shape)
+        c1 = ax1.contourf(np.linspace(x_min, x_max, num=lxf, endpoint=True),
+                          np.linspace(y_min, y_max, num=lyf, endpoint=True),
+                          mue_x_plot[dvy:(lyf+dvy), dvx:(lxf+dvx)], vmin=vmin, vmax=vmax, levels=levels)
+        plt.colorbar(c1)
+        plt.xlabel('x (m)')
+        plt.ylabel('y (m)')
+        #plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
+        plt.plot(s_obs[1], s_obs[0], color='r', marker='o')
+        ax1.set_title('GMRF Mean')
+
+        """Plot GMRF variance"""
+        ax2 = fig1.add_subplot(223)
+        c2 = ax2.contourf(np.linspace(x_min, x_max, num=lxf, endpoint=True),
+                          np.linspace(y_min, y_max, num=lyf, endpoint=True),
+                          var_x_plot[dvy:(lyf+dvy), dvx:(lxf+dvx)], 10, vmin=0)
+        plt.colorbar(c2)
+        plt.xlabel('x (m)')
+        plt.ylabel('y (m)')
+        #plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
+        plt.plot(s_obs[1], s_obs[0], color='r', marker='o')
+        ax2.set_title('GMRF Variance')
 
     """Plot Hyperparameter estimate"""
     _alpha_v, _kappa_v = np.meshgrid(alpha_prior, kappa_prior)
@@ -440,21 +516,16 @@ while True:
     _xx, _yy = np.meshgrid(_x, _y)
     x, y = _xx.ravel(), _yy.ravel()
 
-    ax3 = fig.add_subplot(133, projection='3d')
+    ax3 = fig1.add_subplot(224, projection='3d')
     colors = plt.cm.jet(np.arange(len(x)) / float(np.arange(len(x)).max()))
     #colors = plt.cm.jet(pi_theta.flatten() / float(pi_theta.max()))  # Color height dependent
-    ax3.bar3d(x, y, bottom, 1, 1, pi_theta,color=colors ,alpha=0.5)
+    ax3.bar3d(x, y, bottom, 1, 1, pi_theta, color=colors, alpha=0.5)
     ticksx = np.arange(0.5, len(alpha_prior)+0.5, 1)
     plt.xticks(ticksx, alpha_prior)
     plt.yticks(ticksx, kappa_prior)
     ax3.set_xlabel('alpha')
     ax3.set_ylabel('kappa')
     ax3.set_zlabel('p(theta)')
-    ax3.set_title('Hyperparameter Posterior')
+    ax3.set_title('GMRF Hyperparameter Estimate')
 
     plt.show()
-    #plt.pause(0.001)
-    #plt.draw
-
-
-
