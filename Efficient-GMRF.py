@@ -1,8 +1,13 @@
 import numpy as np
+import time
 import scipy
 from scipy import interpolate
 import matplotlib.pyplot as plt
 from random import randint
+from scipy.sparse import *
+from scipy import *
+from scipy.sparse.linalg import spsolve
+from scipy.sparse import hstack, vstack
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -38,8 +43,8 @@ lxf = 50  # Number of x-axis GMRF vertices inside field
 lyf = 25
 de = np.array([float(x_max - x_min)/(lxf-1), float(y_max - y_min)/(lyf-1)])  # Element width in x and y
 
-dvx = 10  # Number of extra GMRF vertices at border of field
-dvy = 10
+dvx = 15  # Number of extra GMRF vertices at border of field
+dvy = 15
 xg_min = x_min - dvx * de[0]  # Min GMRF field value in x
 xg_max = x_max + dvx * de[0]
 yg_min = y_min - dvy * de[1]
@@ -95,31 +100,38 @@ def gmrf_Q(lx, ly, kappa, alpha, car1=False):
                                                             #               a1,c1            a1,d1               b1,d1           b1,c1
                                                                       field_info[a1,c1], field_info[a1,d1], field_info[b1,d1], field_info[b1,c1]])
     a = alpha + 4
-    Q = np.zeros(shape=(lx * ly, lx * ly))
 
     if car1 == True:
+        Q_rc = np.zeros(shape=(3, 5 * lx * ly)).astype(int)  # Save Q in COO-sparse-format
+        Q_d = np.zeros(shape=(3, 5 * lx * ly)).astype(float)  # Save Q in COO-sparse-format
         for i1 in range(0, (lx * ly)):
-            Q[i1, i1] = a * (1/kappa)
-            Q[i1, infmat[i1, 1:5].astype(int)] = -1 * (1/kappa)
-        return Q
+            a1 = int(5 * i1)
+            Q_rc[0, a1:(a1 + 5)] = i1 * np.ones(shape=(1, 5))  # Row indices
+            Q_rc[1, a1:(a1 + 5)] = np.hstack((i1, infmat[i1, 1:5]))  # Column indices
+            Q_d[0, a1:(a1 + 5)] = np.hstack((a * (1 / kappa) * np.ones(shape=(1, 1)),
+                                              -1 * (1/kappa) * np.ones(shape=(1, 4))))  # Data
+
+        return Q_rc, Q_d
     else:
+        Q_rc = np.zeros(shape=(3, 13 * lx * ly)).astype(int)  # Save Q in COO-sparse-format
+        Q_d = np.zeros(shape=(3, 13 * lx * ly)).astype(float)  # Save Q in COO-sparse-format
         for i2 in range(0, (lx * ly)):
-            Q[i2, i2] = (4 + a **2) * (1/kappa)
-            Q[i2, infmat[i2, 1:5].astype(int)] = -2 * a * (1/kappa)
-            Q[i2, infmat[i2, 5:9].astype(int)] = 1 * (1/kappa)
-            Q[i2, infmat[i2, 9:13].astype(int)] = 2 * (1/kappa)
-        return Q
+            a1 = int(13*i2)
+            Q_rc[0, a1:(a1 + 13)] = i2*np.ones(shape=(1, 13))  # Row indices
+            Q_rc[1, a1:(a1 + 13)] = np.hstack((i2, infmat[i2, 1:5], infmat[i2, 5:9], infmat[i2, 9:13]))  # Column indices
+            Q_d[0, a1:(a1 + 13)] = np.hstack(((4 + a ** 2) * (1 / kappa) * np.ones(shape=(1, 1)), (-2 * a / kappa) * np.ones(shape=(1, 4)),
+                                            (1/kappa) * np.ones(shape=(1, 4)), (2 / kappa) * np.ones(shape=(1, 4))))  # Data
+        return Q_rc, Q_d
 
 
 """#####################################################################################"""
 """SAMPLE from GMRF"""
 def sample_from_GMRF(lx1, ly1, kappa, alpha, car_var, plot_gmrf=False):
     # Calculate precision matrix
-    Q_storage = np.zeros(shape=(lx1 * ly1, lx1 * ly1, len(kappa)))
-
+    #Q_storage = np.zeros(shape=(lx1 * ly1, lx1 * ly1, len(kappa)))
+    d_Q_stor = []  # Create list to store Q matrices
     for i in range(len(kappa)):
-        Q_storage[:, :, i] = gmrf_Q(lx1, ly1, kappa[i], alpha[i], car1=car_var[i])
-
+        d_Q_stor.append(gmrf_Q(lx1, ly1, kappa[i], alpha[i], car1=car_var[i]))
     # Check Infmat and Q
     """
     print(ly, lx, ly*lx)
@@ -135,9 +147,9 @@ def sample_from_GMRF(lx1, ly1, kappa, alpha, car_var, plot_gmrf=False):
     z_I = np.random.standard_normal(size=lx1 * ly1)
     x_Q = np.zeros(shape=(ly1, lx1, len(kappa)))
 
-    for i in range(0, Q_storage.shape[2]):
-        L_Q = np.linalg.cholesky(Q_storage[:, :, i])
-        v_Q = np.linalg.solve(L_Q.T, z_I)
+    for i in range(0, len(kappa)):
+        L_Q = sci.sparse.linalg.splu(d_Q_stor["Q_stor{0}".format(i)])
+        v_Q = L_Q.solve(z_I)
         x_Q_vec = mue_Q + v_Q
         x_Q[:, :, i] = x_Q_vec.reshape((ly1, lx1))
 
@@ -240,30 +252,45 @@ def observation_vector(z_field, dvx, dvy, n, p, x_field, y_field, xf_grid, yf_gr
 
 
 """#####################################################################################"""
+"""Define sparse matrix save and load"""
+def save_sparse_csr(filename, array):
+    # note that .npz extension is added automatically
+    np.savez(filename, data=array.data, indices=array.indices,
+             indptr=array.indptr, shape=array.shape)
+
+def load_sparse_csr(filename):
+    # here we need to add .npz extension manually
+    loader = np.load(filename + '.npz')
+    return csr_matrix((loader['data'], loader['indices'], loader['indptr']),
+                      shape=loader['shape'])
+
+
+"""#####################################################################################"""
 """TEMPERATURE FIELD (Ground truth)"""
 """Analytic field"""
-# z = np.array([[10, 10.625, 12.5, 15.625, 20],[5.625, 6.25, 8.125, 11.25, 15.625],[3, 3.125, 5., 12, 12.5],[5, 2, 3.125, 10, 10.625],[5, 15, 15, 5.625, 9]])
-# X = np.atleast_2d([0, 2, 4, 6, 9])  # Specifies column coordinates of field
-# Y = np.atleast_2d([0, 1, 3, 5, 10])  # Specifies row coordinates of field
-# x_field = np.arange(x_min, x_max, 1e-2)
-# y_field = np.arange(y_min, y_max, 1e-2)
-# f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
-# z_field = f(x_field, y_field)
+z = np.array([[10, 10.625, 12.5, 15.625, 20],[5.625, 6.25, 8.125, 11.25, 15.625],[3, 3.125, 4, 12, 12.5],[5, 2, 3.125, 10, 10.625], [5, 8, 11, 12, 10]])
+X = np.atleast_2d([0, 2, 4, 6, 10])  # Specifies column coordinates of field
+Y = np.atleast_2d([0, 1, 3, 4, 5])  # Specifies row coordinates of field
+x_field = np.arange(x_min, x_max, 1e-2)
+y_field = np.arange(y_min, y_max, 1e-2)
+f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
+z_field = f(x_field, y_field)
 
 """Field from GMRF"""
+"""
 car_var = [False]  # Use car(1)?
 kappa_field = [1]  # Kappa for Choi CAR(2) true field/ Solowjow et. al CAR(1)
 alpha_field = [0.01]  # Alpha for Choi CAR(2) true field/ Solowjow et. al CAR(1)
 
-z = sample_from_GMRF(lx, ly, kappa_field, alpha_field, car_var, 'False')  # GMRF as in paper
+z = sample_from_GMRF(lx, ly, kappa_field, alpha_field, car_var, 'True')  # GMRF as in paper
 X = np.linspace(xg_min, xg_max, num=lx, endpoint=True)  # Specifies column coordinates of field
 Y = np.linspace(yg_min, yg_max, num=ly, endpoint=True)  # Specifies row coordinates of field
-f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
+f = sci.interpolate.interp2d(X, Y, z, kind='cubic')
 
 x_field = np.arange(x_min, x_max, 1e-2)
 y_field = np.arange(y_min, y_max, 1e-2)
 z_field = f(x_field, y_field)
-
+"""
 
 
 """#####################################################################################"""
@@ -272,6 +299,7 @@ z_field = f(x_field, y_field)
 """Choose GMRF simulation parameters"""
 """#######################################"""
 carGMRF = [True]  # Use car(1)? Default is car(2) from Choi et al
+discrete_var = True  # Shall the measurements be taken on the discrete GMRF lattice and do not use shape functions?
 p = 1  # Number of regression coefficients beta
 F = np.ones(shape=(n, p)).astype(float)  # Mean regression functions
 T = 1e-6 * np.ones(shape=(p, p)).astype(float)  # Precision matrix of the regression coefficients
@@ -319,17 +347,53 @@ THETA = np.array(THETA).T
 l_TH = len(THETA[1])  # Number of hyperparameter pairs
 p_THETA = 1.0 / l_TH  # Prior probability for one theta
 
-"""Initialize matrices and vectors"""
+start_time = time.time()
+"""Initialize precision matrix for different thetas"""
+diag_Q_t_inv = np.zeros(shape=(n+p, l_TH)).astype(float)
+
+F_sparse = scipy.sparse.csr_matrix(F)
+FT_sparse = scipy.sparse.csr_matrix(F.T)
 T_inv = np.linalg.inv(T)  # Inverse of the Precision matrix of the regression coefficients
+T_sparse = scipy.sparse.csr_matrix(T)
+Tinv_sparse = scipy.sparse.csr_matrix(1/T)
+
+time_start = time.time()
+
+for jj in range(0, l_TH):
+    print("Initialization", jj)
+
+    """Initialize Q_{x|eta}"""
+    # _{field values|eta}             kappa          alpha
+    Q_rc, Q_d = gmrf_Q(lx, ly, THETA[0, jj], THETA[1, jj], car1=carGMRF)
+    Q_temporary = coo_matrix((Q_d[0, :], (Q_rc[0, :], Q_rc[1, :])), shape=(n, n)).tocsr()
+    Q_check = Q_temporary.todense()
+    Q_eta_inv = np.linalg.inv(coo_matrix((Q_d[0, :], (Q_rc[0, :], Q_rc[1, :])), shape=(n, n)).todense())
+
+    """Q_{x|eta,y=/}"""
+    A2 = Q_temporary.dot(-1 * F_sparse)
+    B1 = -1 * FT_sparse.dot(Q_temporary)
+    B2 = scipy.sparse.csr_matrix.dot(FT_sparse, Q_temporary.dot(F_sparse)) + T_sparse
+    H1 = hstack([Q_temporary,  A2])
+    H2 = hstack([B1, B2])
+    filename = "Q_t_" + str(jj)
+    Q_t = scipy.sparse.vstack([H1, H2]).tocsr()
+    save_sparse_csr(filename, Q_t)
+
+    C1 = Q_eta_inv + np.dot(F, np.dot(T_inv, F.T))
+    C2 = np.dot(F, T_inv)
+    D1 = np.dot(F, T_inv).T
+    Q_t_inv = np.vstack([np.hstack([C1,  C2]),
+                         np.hstack([D1, T_inv])])
+
+    diag_Q_t_inv[:, jj] = Q_t_inv.diagonal()
+
+del A2, B1, B2, H1, H2, C1, C2, D1, Q_eta_inv, Q_t, Q_t_inv, Q_rc, Q_d, T_sparse, F_sparse, FT_sparse
+
+"""Initialize matrices and vectors"""
 b = np.zeros(shape=(n+p, 1)).astype(float)  # Canonical mean
 c = 0.0  # Log-likelihood update vector
-Q_eta = np.zeros(shape=(n, n, l_TH)).astype(float)
-Q_eta_inv = np.zeros(shape=(n, n, l_TH)).astype(float)
-Q_t = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
-Q_t_inv = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
-L_Qt = np.zeros(shape=(n+p, n+p, l_TH)).astype(float)
 h_theta = np.zeros(shape=(n+p, l_TH)).astype(float)
-diag_Q_t_inv = np.zeros(shape=(n+p, l_TH)).astype(float)
+
 mue_theta = np.zeros(shape=(n+p, l_TH)).astype(float)
 mue_x = np.zeros(shape=(n+p, 1)).astype(float)
 var_x = np.zeros(shape=(n+p, 1)).astype(float)
@@ -337,22 +401,8 @@ g_theta = np.zeros(shape=(l_TH, 1)).astype(float)
 log_pi_y = np.zeros(shape=(l_TH, 1)).astype(float)
 pi_theta = np.zeros(shape=(l_TH, 1)).astype(float)
 
-"""Initialize precision matrix for different thetas"""
-for jj in range(0, l_TH):
-    """Initialize Q_{x|eta}"""
-    # _{field values|eta}             kappa          alpha
-    Q_eta[:, :, jj] = gmrf_Q(lx, ly, THETA[0, jj], THETA[1, jj], car1=carGMRF)
-    Q_eta_inv[:, :, jj] = np.linalg.inv(Q_eta[:, :, jj])
-
-    """Q_{x|eta,y=/}"""
-    Q_t[:, :, jj] = np.vstack((np.hstack((Q_eta[:, :, jj],  np.dot(-1 * Q_eta[:, :, jj], F))),
-                               np.hstack((np.dot(-1 * F.T, Q_eta[:, :, jj]),
-                                          np.dot(F.T, np.dot(Q_eta[:, :, jj], F)) + T))))
-    Q_t_inv[:, :, jj] = np.vstack((np.hstack((Q_eta_inv[:, :, jj] + np.dot(F, np.dot(T_inv, F.T)),  np.dot(F, T_inv))),
-                                   np.hstack((np.dot(F, T_inv).T, T_inv))))
-    diag_Q_t_inv[:, jj] = np.diagonal(Q_t_inv[:, :, jj])
-
-
+time_2 = time.time()
+print("--- %s seconds --- Initialization time" % (time_2 - time_start))
 """#####################################################################################"""
 """START SIMULATION"""
 # Begin for-slope for all N observation at time t
@@ -360,28 +410,31 @@ while True:
     #x = raw_input("Press [enter] to continue or [q] to quit")
     #if x == 'q':
         #break
-
     """Compute observation vector and observation"""
     u, y_t, s_obs = observation_vector(z_field, dvx, dvy, n, p, x_field, y_field,
                                 xf_grid, yf_grid, lx, ly, de[0], de[1], var_x,
-                                discrete_y=False)
+                                discrete_y=discrete_var)
+    u_sparse = scipy.sparse.csr_matrix(u)
 
     """Update canonical mean"""
     b = b + (y_t/sigma_w_squ) * u
-
     """Compute observation-dependent likelihood terms"""
     c = c - ((y_t ** 2) / (2 * sigma_w_squ))  # Likelihood term
 
     for jj in range(0, l_TH):
         print(jj)
         """Calculate observation precision (?)"""
-        L_Qt[:, :, jj] = np.linalg.cholesky(Q_t[:, :, jj])
-        v_h = np.linalg.solve(L_Qt[:, :, jj], u)
-        h_theta[:, jj] = np.linalg.solve(L_Qt[:, :, jj].T, v_h).T
+        #L_Qt[:, :, jj] = np.linalg.cholesky(Q_t[:, :, jj])
+        #v_h = np.linalg.solve(L_Qt[:, :, jj], u)
+        #h_theta[:, jj] = np.linalg.solve(L_Qt[:, :, jj].T, v_h).T
+        filename = "Q_t_" + str(jj)
+        Q_t = load_sparse_csr(filename)
+        h_theta[:, jj] = scipy.sparse.linalg.spsolve(Q_t, u_sparse).T
 
         """Update Precision Matrix"""
         diag_Q_t_inv[:, jj] = np.subtract(diag_Q_t_inv[:, jj],  (np.multiply(h_theta[:, jj], h_theta[:, jj]) / (sigma_w_squ + np.dot(u.T, h_theta[:, jj]))))
-        Q_t[:, :, jj] = Q_t[:, :, jj] + (1 / sigma_w_squ) * np.dot(u, u.T)
+        Q_t = Q_t + (1 / sigma_w_squ) * u_sparse.dot(u_sparse.T)
+        save_sparse_csr(filename, Q_t)
 
         g_theta[jj] = g_theta[jj] - (0.5 * np.log(1 + (1 / sigma_w_squ) * np.dot(u.T, h_theta[:, jj])))
     # End for-slope for all N observation at time t
@@ -389,9 +442,7 @@ while True:
     for hh in range(0, l_TH):
         print(hh)
         """Compute canonical mean"""
-        L_Qt[:, :, hh] = np.linalg.cholesky(Q_t[:, :, hh])
-        v_t = np.linalg.solve(L_Qt[:, :, hh], b)
-        mue_theta[:, hh] = np.linalg.solve(L_Qt[:, :, hh].T, v_t).T
+        mue_theta[:, hh] = scipy.sparse.linalg.spsolve(Q_t, b).T
 
         """Compute Likelihood"""
         log_pi_y[hh] = c + g_theta[hh] + 0.5 * np.dot(b.T, mue_theta[:, hh]) # - (1 / 2) * np.log(2*np.pi*sigma_w_squ)  # Compute likelihood
@@ -410,7 +461,8 @@ while True:
         var_x[ji] = np.dot((diag_Q_t_inv[ji] + (np.subtract(mue_theta[ji, :], mue_x[ji] * np.ones(shape=(1, len(THETA[1])))) ** 2)),
                            pi_theta)
 
-
+    time_end = time.time()
+    print("--- %s seconds --- Initialization time" % (time_end - time_2))
 
     """#####################################################################################"""
     """PLOT RESULTS"""
