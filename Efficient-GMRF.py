@@ -1,4 +1,5 @@
-import numpy as np
+
+
 import time
 import scipy
 from scipy import interpolate
@@ -11,6 +12,7 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import hstack, vstack
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 
 """
 Efficient-GMRF 
@@ -61,6 +63,35 @@ y_grid = np.atleast_2d(np.linspace(yg_min, yg_max, ly, endpoint=True)).T
 
 
 """#####################################################################################"""
+"""TEMPERATURE FIELD (Ground truth)"""
+def true_field(field_analytical):
+    if field_analytical == True:
+        """Analytic field"""
+        z = np.array([[10, 10.625, 12.5, 15.625, 20],[5.625, 6.25, 8.125, 11.25, 15.625],[3, 3.125, 4, 12, 12.5],[5, 2, 3.125, 10, 10.625], [5, 8, 11, 12, 10]])
+        X = np.atleast_2d([0, 2, 4, 6, 10])  # Specifies column coordinates of field
+        Y = np.atleast_2d([0, 1, 3, 4, 5])  # Specifies row coordinates of field
+        x_field = np.arange(x_min, x_max, 1e-2)
+        y_field = np.arange(y_min, y_max, 1e-2)
+        f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
+        z_field = f(x_field, y_field)
+        return x_field, y_field, z_field, f
+    if field_analytical == False:
+        """Field from GMRF"""
+        car_var = [False]  # Use car(1)?
+        kappa_field = [1]  # Kappa for Choi CAR(2) true field/ Solowjow et. al CAR(1)
+        alpha_field = [0.01]  # Alpha for Choi CAR(2) true field/ Solowjow et. al CAR(1)
+
+        z = sample_from_GMRF(lx, ly, kappa_field, alpha_field, car_var, 'True')  # GMRF as in paper
+        X = np.linspace(xg_min, xg_max, num=lx, endpoint=True)  # Specifies column coordinates of field
+        Y = np.linspace(yg_min, yg_max, num=ly, endpoint=True)  # Specifies row coordinates of field
+        f = sci.interpolate.interp2d(X, Y, z, kind='cubic')
+
+        x_field = np.arange(x_min, x_max, 1e-2)
+        y_field = np.arange(y_min, y_max, 1e-2)
+        z_field = f(x_field, y_field)
+        return x_field, y_field, z_field, f
+x_field, y_field, z_field, f = true_field(field_analytical=True)
+
 """ Define field topology of the vector field values and precision matrix"""
 def gmrf_Q(lx, ly, kappa, alpha, car1=False):
 
@@ -196,84 +227,39 @@ alpha = [0.0025, 0.01, 0.04, 0.1, 0.001, 0.00001]
 sample_from_GMRF(lx, ly, kappa, alpha, car_var)
 """
 
-"""Define continous observation vector"""
-def observation_vector(z_field, dvx, dvy, n, p, x_field, y_field, xf_grid, yf_grid, lx, a1, b1, x_auv, discrete_y, control_var):
+"""Calculate new observation vector"""
+def interpolation_matrix(x_local2):
+    u1 = np.zeros(shape=(n + p, 1)).astype(float)
+    nx = int((x_local2[0] - xg_min) / de[0])  # Calculates the vertice column x-number at which the shape element starts.
+    ny = int((x_local2[1] - yg_min) / de[1])  # Calculates the vertice row y-number at which the shape element starts.
+
+    # Calculate position value in element coord-sys in meters
+    x_el = float(0.1 * (x_local2[0] / 0.1 - int(x_local2[0] / 0.1))) - de[0] / 2
+    y_el = float(0.1 * (x_local2[1] / 0.1 - int(x_local2[1] / 0.1))) - de[1] / 2
+
+    # Define shape functions, "a" is element width in x-direction
+    u1[(ny * lx) + nx] = (1 / (de[0] * de[1])) * ((x_el - de[0] / 2) * (y_el - de[1] / 2))  # u for lower left corner
+    u1[(ny * lx) + nx + 1] = (-1 / (de[0] * de[1])) * ((x_el + de[0] / 2) * (y_el - de[1] / 2))  # u for lower right corner
+    u1[((ny + 1) * lx) + nx] = (-1 / (de[0] * de[1])) * ((x_el - de[0] / 2) * (y_el + de[1] / 2))  # u for upper left corner
+    u1[((ny + 1) * lx) + nx + 1] = (1 / (de[0] * de[1])) * ((x_el + de[0] / 2) * (y_el + de[1] / 2))  # u for upper right corner
+    return u1, np.array([nx, ny])
+
+"""Calculate new observation vector"""
+def observation_vector(x_local1, control_var, sigma_w_squ):
     # Define Observation vector that maps grid vertices to a continuous measurement location
-    # lx = Number of vertices columns (~x)
-    # ly =  Number of vertices rows (~y)
-    # a,b is the distance between two adjacent vertices in meters
+    if control_var == False:  # Random observation vector
+        nxf = randint(0, len(x_field))  # Measurement at random TRUE FIELD grid
+        nyf = randint(0, len(y_field))
+        s_obs = [y_field[nyf], x_field[nxf]]
+    else: # Observation from actual auv state
+        s_obs = [x_local1[1], x_local1[0]]
 
-    if discrete_y == True:
-        if control_var == True:
-            print('Control for discrete observations not implemented!')
-        elif control_var == False:
-            """Create discrete measurement"""
-            nxf = randint(0, len(xf_grid) - 2)  # Measurement at random grid
-            nyf = randint(0, len(yf_grid) - 2)
-            s_obs = [yf_grid[nyf], xf_grid[nxf]]
-            sd_obs = [int((s_obs[0]) * 1e2), int((s_obs[1]) * 1e2)]
-            y1 = np.array(z_field[sd_obs[0], sd_obs[1]])
-            print('x/y in m,s_obs[0]', ' | ', s_obs[0], ' | ', s_obs[1], 'y1', y1)
-            nx = nxf + dvx  # Calculates the vertice column x-number at which the shape element starts.
-            ny = nyf + dvy  # Calculates the vertice row y-number at which the shape element starts.
-            kk = ny * lx + nx
-            u1 = np.zeros(shape=(n+p, 1)).astype(float)  # Observation topology vector
-            u1[kk] = 1
-            return u1, y1, s_obs
-    elif discrete_y == False:
-        if control_var == True:
-            """Continuous measurement from x_auv"""
-            s_obs = [x_auv[1], x_auv[0]]
-            print(s_obs)
-            sd_obs = [int((s_obs[0]) * 1e2), int((s_obs[1]) * 1e2)]
-            print(z_field.shape, z_field[-1, -1])
-            y1 = np.array(z_field[sd_obs[0]-1, sd_obs[1]-1])
-            nx = int((s_obs[1] - xg_min) / a1)  # Calculates the vertice column x-number at which the shape element starts.
-            ny = int((s_obs[0] - yg_min) / b1)  # Calculates the vertice row y-number at which the shape element starts.
+    sd_obs = [int((x_local1[1]) * 1e2), int((x_local1[0]) * 1e2)]
+    y1 = np.array(z_field[sd_obs[0], sd_obs[1]]) + np.random.normal(loc=0.0, scale=sqrt(sigma_w_squ), size=1)
+    # print('n_lu', n_lu, 'n_ru', n_ru, 'n_lo', n_lo, 'n_ro', n_ro )
 
-            # Calculate position value in element coord-sys in meters
-            x_el = float(0.1 * (s_obs[1] / 0.1 - int(s_obs[1] / 0.1))) - a1 / 2
-            y_el = float(0.1 * (s_obs[0] / 0.1 - int(s_obs[0] / 0.1))) - b1 / 2
-            u1 = np.zeros(shape=(n + p, 1)).astype(float)
-            n_lu = (ny * lx) + nx
-            n_ru = (ny * lx) + nx + 1
-            n_lo = ((ny + 1) * lx) + nx
-            n_ro = ((ny + 1) * lx) + nx + 1
-
-            # Define shape functions, "a" is element width in x-direction
-            u1[n_lu] = (1 / (a1 * b1)) * ((x_el - a1 / 2) * (y_el - b1 / 2))
-            u1[n_ru] = (-1 / (a1 * b1)) * ((x_el + a1 / 2) * (y_el - b1 / 2))
-            u1[n_lo] = (-1 / (a1 * b1)) * ((x_el - a1 / 2) * (y_el + b1 / 2))
-            u1[n_ro] = (1 / (a1 * b1)) * ((x_el + a1 / 2) * (y_el + b1 / 2))
-            return u1, y1, s_obs
-        elif control_var == False:
-            """Random continuous measurement"""
-            nxf = randint(0, len(x_field) - 2)  # Measurement at random TRUE FIELD grid
-            nyf = randint(0, len(y_field) - 2)
-            s_obs = [y_field[nyf], x_field[nxf]]
-            sd_obs = [int((s_obs[0]) * 1e2), int((s_obs[1]) * 1e2)]
-            y1 = np.array(z_field[sd_obs[0], sd_obs[1]])
-            nx = int((s_obs[1] - xg_min) / a1)  # Calculates the vertice column x-number at which the shape element starts.
-            ny = int((s_obs[0] - yg_min) / b1)  # Calculates the vertice row y-number at which the shape element starts.
-
-            # Calculate position value in element coord-sys in meters
-            x_el = float(0.1 * (s_obs[1]/0.1 - int(s_obs[1]/0.1))) - a1/2
-            y_el = float(0.1 * (s_obs[0]/0.1 - int(s_obs[0]/0.1))) - b1/2
-            u1 = np.zeros(shape=(n+p, 1)).astype(float)
-            n_lu = (ny * lx) + nx
-            n_ru = (ny * lx) + nx + 1
-            n_lo = ((ny + 1) * lx) + nx
-            n_ro = ((ny + 1) * lx) + nx + 1
-
-            # Define shape functions, "a" is element width in x-direction
-            u1[n_lu] = (1 / (a1 * b1)) * ((x_el - a1/2) * (y_el - b1/2))
-            u1[n_ru] = (-1 / (a1 * b1)) * ((x_el + a1/2) * (y_el - b1/2))
-            u1[n_lo] = (-1 / (a1 * b1)) * ((x_el - a1/2) * (y_el + b1/2))
-            u1[n_ro] = (1 / (a1 * b1)) * ((x_el + a1/2) * (y_el + b1/2))
-            #print('n_lu', n_lu, 'n_ru', n_ru, 'n_lo', n_lo, 'n_ro', n_ro )
-            return u1, y1, s_obs
-    else:
-        print('Invalid case definition for observation type')
+    u1, xx = interpolation_matrix(x_local1)
+    return u1, y1, s_obs
 
 """Define sparse matrix save and load"""
 def save_sparse_csr(filename, array):
@@ -287,52 +273,25 @@ def load_sparse_csr(filename):
                       shape=loader['shape'])
 
 """Define AUV dynamics"""
-def auv_dynamics(v_auv, x_auv, u_auv, delta_t):
-    x_auv[0] = x_auv[0] + v_auv * cos(x_auv[2]) * delta_t
-    x_auv[1] = x_auv[1] + v_auv * sin(x_auv[2]) * delta_t
-    x_auv[2] = x_auv[2] + u_auv
+def auv_dynamics(v_auv, x_auv, u_auv, epsilon_a, delta_t):
+    x_auv_out = np.zeros(shape=(3))
+    x_auv_out[0] = x_auv[0] + v_auv * cos(x_auv[2]) * delta_t
+    x_auv_out[1] = x_auv[1] + v_auv * sin(x_auv[2]) * delta_t
+    x_auv_out[2] = x_auv[2] + u_auv * delta_t + epsilon_a * sqrt(delta_t)
 
     # Prevent AUV from leaving the true field
-    if x_auv[0] <= 0.01:
-        x_auv[0] = 0.01
-    elif x_auv[0] > x_field[-1]:
-        x_auv[0] = x_field[-1]
-    elif x_auv[1] < 0.01:
-        x_auv[1] = 0.01
-    elif x_auv[1] > y_field[-1]:
-        x_auv[1] = y_field[-1]
+    if x_auv_out[0] < 0:
+        x_auv_out[0] = 0
+    if x_auv_out[0] > x_field[-1]:
+        x_auv_out[0] = x_field[-1]
+    if x_auv_out[1] < 0:
+        x_auv_out[1] = 0
+    if x_auv_out[1] > y_field[-1]:
+        x_auv_out[1] = y_field[-1]
+    if x_auv_out[2] > 2*pi:
+        x_auv_out[2] = x_auv[2] - 2*pi
 
-    return x_auv
-
-
-
-
-"""#####################################################################################"""
-"""TEMPERATURE FIELD (Ground truth)"""
-"""Analytic field"""
-z = np.array([[10, 10.625, 12.5, 15.625, 20],[5.625, 6.25, 8.125, 11.25, 15.625],[3, 3.125, 4, 12, 12.5],[5, 2, 3.125, 10, 10.625], [5, 8, 11, 12, 10]])
-X = np.atleast_2d([0, 2, 4, 6, 10])  # Specifies column coordinates of field
-Y = np.atleast_2d([0, 1, 3, 4, 5])  # Specifies row coordinates of field
-x_field = np.arange(x_min, x_max, 1e-2)
-y_field = np.arange(y_min, y_max, 1e-2)
-f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
-z_field = f(x_field, y_field)
-
-"""Field from GMRF"""
-"""
-car_var = [False]  # Use car(1)?
-kappa_field = [1]  # Kappa for Choi CAR(2) true field/ Solowjow et. al CAR(1)
-alpha_field = [0.01]  # Alpha for Choi CAR(2) true field/ Solowjow et. al CAR(1)
-
-z = sample_from_GMRF(lx, ly, kappa_field, alpha_field, car_var, 'True')  # GMRF as in paper
-X = np.linspace(xg_min, xg_max, num=lx, endpoint=True)  # Specifies column coordinates of field
-Y = np.linspace(yg_min, yg_max, num=ly, endpoint=True)  # Specifies row coordinates of field
-f = sci.interpolate.interp2d(X, Y, z, kind='cubic')
-
-x_field = np.arange(x_min, x_max, 1e-2)
-y_field = np.arange(y_min, y_max, 1e-2)
-z_field = f(x_field, y_field)
-"""
+    return x_auv_out
 
 
 """#####################################################################################"""
@@ -341,22 +300,28 @@ z_field = f(x_field, y_field)
 """#######################################"""
 """Choose GMRF simulation parameters"""
 carGMRF = [False]  # Use car(1)? Default is car(2) from Choi et al
-discrete_var = False  # Shall the measurements be taken on the discrete GMRF lattice and do not use shape functions?
 Q_calc_var = False  # Re-Calculate precision matrix at Initialization? False: Load stored precision matrix
 p = 1  # Number of regression coefficients beta
-F = np.ones(shape=(n, p)).astype(float)  # Mean regression functions
-T = 1e-6 * np.ones(shape=(p, p)).astype(float)  # Precision matrix of the regression coefficients
+F = np.ones(shape=(n, p))  # Mean regression functions
+T = 1e-6 * np.ones(shape=(p, p))  # Precision matrix of the regression coefficients
 sigma_w_squ = 0.2 ** 2  # Measurement variance
-delta_GMRF = 100  # Sample/Calculation time in ms of GMRF algorithm
+sample_time_gmrf = 100  # Sample/Calculation time in ms of GMRF algorithm
+simulation_end_time = 10000  # Run time of simulation in ms
 
 """#######################################"""
 """Choose control parameters"""
-x_auv = np.array([1, 1, 0.5]).T  # Initial AUV state
-v_auv = 3  # AUV velocity in meter/second (constant)
-u_auv = 0  # Initial control input
-control_var = True
-K = 10  # Number of virtual roll-out pathes
-N_K = 100  # Control horizon length
+control_var = True  #
+
+x_auv = np.array([5, 0.5, 0.5]).T  # Initial AUV state
+v_auv = 0.5  # AUV velocity in meter/second (constant)
+
+n_k = 15  # Number of virtual roll-out pathes
+n_horizon = 15  # Control horizon length in s
+N_horizon = 15  # Number of discrete rollout points
+t_cstep = n_horizon / N_horizon  # Control horizon step size in s
+sigma_epsilon = pi / 8  # Exploration noise in radians, 90 grad = 1,57
+n_updates = 10  # Control loop updates
+R_cost = 10 * np.ones(shape=(1, 1))  # Immediate control cost
 
 """#######################################"""
 """Define plot parameters"""
@@ -421,7 +386,7 @@ Tinv_sparse = scipy.sparse.csr_matrix(1/T)
 
 if Q_calc_var == True:
     for jj in range(0, l_TH):
-        print("Initialization", jj)
+        #print("Initialization", jj)
 
         """Initialize Q_{x|eta}"""
         # _{field values|eta}             kappa          alpha
@@ -464,29 +429,46 @@ else:
 
 
 """Initialize matrices and vectors"""
-b = np.zeros(shape=(n+p, 1)).astype(float)  # Canonical mean
+b = np.zeros(shape=(n+p, 1)) # Canonical mean
 c = 0.0  # Log-likelihood update vector
-h_theta = np.zeros(shape=(n+p, l_TH)).astype(float)
-mue_theta = np.zeros(shape=(n+p, l_TH)).astype(float)
-mue_x = np.zeros(shape=(n+p, 1)).astype(float)
-var_x = np.zeros(shape=(n+p, 1)).astype(float)
-g_theta = np.zeros(shape=(l_TH, 1)).astype(float)
-log_pi_y = np.zeros(shape=(l_TH, 1)).astype(float)
-pi_theta = np.zeros(shape=(l_TH, 1)).astype(float)
-trajectory_1 = np.array(x_auv).reshape(1,3)
+h_theta = np.zeros(shape=(n+p, l_TH))
+g_theta = np.zeros(shape=(l_TH, 1))
+log_pi_y = np.zeros(shape=(l_TH, 1))
+pi_theta = np.zeros(shape=(l_TH, 1))
+mue_theta = np.zeros(shape=(n+p, l_TH))
+mue_x = np.zeros(shape=(n+p, 1))
+var_x = np.zeros(shape=(n+p, 1))
 
-print(trajectory_1)
+n_storage = 0
+stored_mue_x = np.zeros(shape=(n+p, simulation_end_time/sample_time_gmrf))
+stored_var_x = np.zeros(shape=(n+p, simulation_end_time/sample_time_gmrf))
+stored_phi_theta = np.zeros(shape=(l_TH, simulation_end_time/sample_time_gmrf))
+trajectory_1 = np.array(x_auv).reshape(1, 3)
+
+
+"""Initialize u and epsilon for PI"""
+R_cost_inv = np.linalg.inv(R_cost)  # Inverse of the Precision matrix of the regression coefficients
+u_optimal = np.zeros(shape=(N_horizon, 1))
+u_auv = np.zeros(shape=(N_horizon, n_k))
+epsilon_auv = np.zeros(shape=(N_horizon, n_k))
+tau_x = np.zeros(shape=(len(x_auv), N_horizon, n_k))
+tau_optimal = np.zeros(shape=(len(x_auv), N_horizon))
+var_x_tau = np.zeros(shape=(N_horizon, n_k))
+control_cost = np.zeros(shape=(N_horizon, n_k))
+exp_lambda_S = np.zeros(shape=(N_horizon, n_k))
+S_tau = np.zeros(shape=(N_horizon, n_k))
+P_tau = np.zeros(shape=(N_horizon, n_k))
+
 
 """Initialize ion plot"""
 def initialize_plot():
     plt.ion()
     fig1 = plt.figure(figsize=(8, 3))
-    line1 = Line2D([], [], color='black')
 
     ax0 = fig1.add_subplot(221)
     cp = plt.contourf(x_field, y_field, z_field, vmin=vmin, vmax=vmax, levels=levels)
     plt.colorbar(cp); plt.title('True Field'); plt.xlabel('x (m)'); plt.ylabel('y (m)')
-    ax0.add_line(line1)
+
 
     ax1 = fig1.add_subplot(222)
     plt.colorbar(cp); plt.xlabel('x (m)'); plt.ylabel('y (m)'); ax1.set_title('GMRF Mean')
@@ -510,9 +492,8 @@ def initialize_plot():
     ax3.set_xlabel('alpha'); ax3.set_ylabel('kappa'); ax3.set_zlabel('p(theta)'); ax3.set_title('GMRF Hyperparameter Estimate')
 
     plt.draw()
-    return fig1, ax0, ax1, ax2, ax3, x, y, bottom, colors, line1
-fig1, ax0, ax1, ax2, ax3, x, y, bottom, colors, line1 = initialize_plot()
-
+    return fig1, ax0, ax1, ax2, ax3, x, y, bottom, colors
+fig1, ax0, ax1, ax2, ax3, x, y, bottom, colors = initialize_plot()
 
 """#####################################################################################"""
 """START SIMULATION"""
@@ -520,14 +501,18 @@ time_2 = time.time()
 print("--- %s seconds --- Initialization time" % (time_2 - time_start))
 
 # Begin for-slope for all N observation at time t
-for time_in_ms in range(0, 12000):  # 1200 ms sekunden
-    time_3 = time.time()
+for time_in_ms in range(0, simulation_end_time):  # 1200 ms sekunden
 
-    """Agent belief/ GMRF"""
-    if time_in_ms % delta_GMRF < 0.0000001:
+
+    """GAUSSIAN MARKOV RANDOM FIELD"""
+    if time_in_ms % sample_time_gmrf < 0.0000001:
+        time_3 = time.time()
+
+        x_auv = auv_dynamics(v_auv, x_auv, u_optimal[0], 0, sample_time_gmrf/100)
+        trajectory_1 = np.vstack([trajectory_1, x_auv])
+
         """Compute observation vector and observation"""
-        u, y_t, s_obs = observation_vector(z_field, dvx, dvy, n, p, x_field, y_field,
-                                    xf_grid, yf_grid, lx, de[0], de[1], x_auv, discrete_var, control_var)
+        u, y_t, s_obs = observation_vector(x_auv, control_var, sigma_w_squ)
         u_sparse = scipy.sparse.csr_matrix(u)
 
         """Update canonical mean and observation-dependent likelihood terms"""
@@ -563,8 +548,66 @@ for time_in_ms in range(0, 12000):  # 1200 ms sekunden
             var_x[ji] = np.dot((diag_Q_t_inv[ji] + (np.subtract(mue_theta[ji, :], mue_x[ji] * np.ones(shape=(1, len(THETA[1])))) ** 2)),
                                pi_theta)
 
+        # Store for plot
+        stored_mue_x[:, [n_storage]] = mue_x
+        stored_var_x[:, [n_storage]] = var_x
+        stored_phi_theta[:, [n_storage]] = pi_theta
         time_4 = time.time()
         print("--- %s seconds --- GMRF algorithm time" % (time_4 - time_3))
+        n_storage += 1
+
+
+
+        """#####################################################################################"""
+        """PATH INTEGRAL CONTROL"""
+        u_optimal[:-1] = u_optimal[1:]
+        u_optimal[-1] = 0
+
+        for ii in range(0, n_updates):  # Repeat PI algorithm for convergence
+            for jj in range(0, n_k):  # Iterate over all trajectories
+                tau_x[:, 0, jj] = x_auv  # Set initial trajectory state
+                # Calculate exploration noise (Only PI-Controller Hyperparameter)
+                epsilon_auv[:, jj] = sigma_epsilon * np.random.standard_normal(N_horizon)
+
+                for kk in range(0, N_horizon-1):  # Iterate over length of trajectory except of last entry
+                    # Sample roll-out trajectory
+                    print(kk,tau_x[:, 0, jj],'x_auv', x_auv)
+                    tau_x[:, kk+1, jj] = auv_dynamics(v_auv, tau_x[:, kk, jj], u_optimal[kk], epsilon_auv[kk, jj], t_cstep)
+
+                for kk in range(0, N_horizon):  # Iterate over length of trajectory
+                    #g_m = np.array(1)
+                    #M_m = (1 / np.dot(g_m.T, R_cost_inv.dot(g_m))) * np.dot(R_cost_inv, np.dot(g_m, g_m.T))
+                    # Compute variance along sampled trajectory
+                    M_m = 1  # Only for p=1 and this simple state model !
+                    A_z, numb_ind = interpolation_matrix(tau_x[:, kk, jj])
+                    var_x_tau[kk, jj] = np.dot(A_z.T, var_x)
+                    control_cost[kk, jj] = 0.5 * np.dot(np.array(u_optimal[kk]+epsilon_auv[kk, jj]).T,
+                                                        np.dot(R_cost, np.array(u_optimal[kk]+epsilon_auv[kk, jj])))
+
+                for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
+                    S_tau[kk, jj] = np.sum(var_x_tau[kk:, jj]) + np.sum(control_cost[kk:, jj])
+                for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
+                    exp_lambda_S[kk, jj] = exp(-10 * (S_tau[kk, jj] - np.amin(S_tau[:, jj])) /
+                                               (np.amax(S_tau[:, jj]) - np.amin(S_tau[:, jj])))
+
+            u_correction = np.zeros(shape=(N_horizon, 1))
+            for kk in range(0, N_horizon):  # Iterate over length of trajectory
+                for jj in range(0, n_k):  # Iterate over all trajectories
+                    P_tau[kk, jj] = exp_lambda_S[kk, jj] / np.sum(exp_lambda_S[kk, :])
+                for jj in range(0, n_k):  # Iterate over all trajectories
+                    u_correction[kk] += P_tau[kk, jj] * M_m * epsilon_auv[kk, jj]
+
+            u_optimal = u_optimal + u_correction
+
+
+        tau_optimal[:, 0] = x_auv
+        for kk in range(0, N_horizon - 1):  # Iterate over length of trajectory except of last entry
+            tau_optimal[:, kk + 1] = auv_dynamics(v_auv, tau_x[:, kk, jj], u_optimal[kk], 0, t_cstep)
+
+        # Random Walk
+        #u_auv = ((0.2 * pi) / 1000) * randint(-500, 500)  # Control input for random walk
+        #x_auv = auv_dynamics(v_auv, x_auv, u_auv, 0.01)
+
 
         """#####################################################################################"""
         """PLOT RESULTS"""
@@ -572,7 +615,6 @@ for time_in_ms in range(0, 12000):  # 1200 ms sekunden
         xv, yv = np.meshgrid(x_grid, y_grid)
         mue_x_plot = mue_x[0:(lx * ly)].reshape((ly, lx))
         var_x_plot = var_x[0:(lx * ly)].reshape((ly, lx))
-
         # Create vectors for enumerating the GMRF nodes
         xv_list = xv.reshape((lx * ly, 1))
         yv_list = yv.reshape((lx * ly, 1))
@@ -583,8 +625,8 @@ for time_in_ms in range(0, 12000):  # 1200 ms sekunden
         """Plot True Field"""
         ax0 = fig1.add_subplot(221)
         cp = plt.contourf(x_field, y_field, z_field, vmin=vmin, vmax=vmax, levels=levels)
-        line1.set_data(trajectory_1[:, 0], trajectory_1[:, 1])
-        plt.plot(s_obs[1], s_obs[0], marker='o', markerfacecolor='none')
+        plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
+
 
         if PlotField == True:
             """Plot GMRF mean"""
@@ -614,7 +656,12 @@ for time_in_ms in range(0, 12000):  # 1200 ms sekunden
                               var_x_plot, 10, vmin=var_min, vmax=var_max)
             plt.scatter(xv, yv, marker='+', facecolors='dimgrey')
             plt.plot([x_min, x_min, x_max, x_max, x_min], [y_min, y_max, y_max, y_min, y_min], "k")
-            plt.plot(s_obs[1], s_obs[0], marker='o', markerfacecolor='none')
+            plt.plot(trajectory_1[:, 0], trajectory_1[:, 1], color='green')
+            for jj in range(0, n_k):  # Iterate over all trajectories
+                plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
+            plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
+            plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
+
         else:
             """Plot GMRF mean"""
             ax1 = fig1.add_subplot(222)
@@ -622,7 +669,7 @@ for time_in_ms in range(0, 12000):  # 1200 ms sekunden
                               np.linspace(y_min, y_max, num=lyf, endpoint=True),
                               mue_x_plot[dvy:(lyf + dvy), dvx:(lxf + dvx)], vmin=vmin, vmax=vmax, levels=levels)
             # plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
-            plt.plot(s_obs[1], s_obs[0], marker='o', markerfacecolor='none')
+            plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
 
             """Plot GMRF variance"""
             ax2 = fig1.add_subplot(223)
@@ -630,7 +677,11 @@ for time_in_ms in range(0, 12000):  # 1200 ms sekunden
                               np.linspace(y_min, y_max, num=lyf, endpoint=True),
                               var_x_plot[dvy:(lyf + dvy), dvx:(lxf + dvx)], 10, vmin=var_min, vmax=var_max)
             # plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
-            plt.plot(s_obs[1], s_obs[0], marker='o', markerfacecolor='none')
+            plt.plot(trajectory_1[:, 0], trajectory_1[:, 1], color='green')
+            for jj in range(0, n_k):  # Iterate over all trajectories
+                plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
+            plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
+            plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
 
         """Plot Hyperparameter estimate"""
         ax3 = fig1.add_subplot(224, projection='3d')
@@ -639,27 +690,5 @@ for time_in_ms in range(0, 12000):  # 1200 ms sekunden
 
         fig1.canvas.draw_idle()
         plt.pause(0.5)
-        #plt.waitforbuttonpress()
-
-    """#####################################################################################"""
-    """PATH INTEGRAL CONTROL"""
-
-    """Initialize u and epsilon"""
-
-    """Sample k-rollouts"""
-
-    """Calculate state cost"""
-
-    """Calculate path cost and path probability"""
-
-    """Compute control correction"""
-
-    """Average and update control"""
-    u_auv = ((0.3 * pi) / 1000) * randint(-500, 500)  # Control input for random walk
-    x_auv = auv_dynamics(v_auv, x_auv, u_auv, 0.01)
-
-    trajectory_1 = np.vstack([trajectory_1, x_auv])
-    print('shape', trajectory_1.shape)
-    """Check PI Loop"""
-
-
+        plt.clf()
+        # plt.waitforbuttonpress()
