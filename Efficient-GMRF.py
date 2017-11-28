@@ -2,15 +2,15 @@
 
 import time
 import scipy
-from scipy import interpolate
-from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
 from random import randint
-from scipy.sparse import *
-from scipy import *
+
+from scipy import exp, sin, cos, sqrt, pi, interpolate
+from scipy.sparse import csr_matrix, hstack, vstack
 from scipy.sparse.linalg import spsolve
-from scipy.sparse import hstack, vstack
+
+import matplotlib.pyplot as plt
 from matplotlib import cm
+from matplotlib.lines import Line2D
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
@@ -275,21 +275,43 @@ def load_sparse_csr(filename):
 """Define AUV dynamics"""
 def auv_dynamics(v_auv, x_auv, u_auv, epsilon_a, delta_t):
     x_auv_out = np.zeros(shape=(3))
-    x_auv_out[0] = x_auv[0] + v_auv * cos(x_auv[2]) * delta_t
-    x_auv_out[1] = x_auv[1] + v_auv * sin(x_auv[2]) * delta_t
+
     x_auv_out[2] = x_auv[2] + u_auv * delta_t + epsilon_a * sqrt(delta_t)
+    x_auv_out[0] = x_auv[0] + v_auv * cos(x_auv_out[2]) * delta_t
+    x_auv_out[1] = x_auv[1] + v_auv * sin(x_auv_out[2]) * delta_t
 
     # Prevent AUV from leaving the true field
     if x_auv_out[0] < 0:
         x_auv_out[0] = 0
-    if x_auv_out[0] > x_field[-1]:
-        x_auv_out[0] = x_field[-1]
+        if pi/2 < x_auv_out[2] < pi:
+            x_auv_out[2] = 0.49*pi
+        if pi < x_auv_out[2] < 1.5*pi:
+            x_auv_out[2] = 1.51*pi
+
     if x_auv_out[1] < 0:
         x_auv_out[1] = 0
+        if pi < x_auv_out[2] < 1.49*pi:
+            x_auv_out[2] = pi
+        if 1.5*pi < x_auv_out[2] <= 2*pi:
+          x_auv_out[2] = 0.01
+
+    if x_auv_out[0] > x_field[-1]:
+        x_auv_out[0] = x_field[-1]
+        if 0 < x_auv_out[2] < pi/2:
+            x_auv_out[2] = 0.51*pi
+        if 1.5*pi < x_auv_out[2] <= 2*pi:
+            x_auv_out[2] = 1.49*pi
+
     if x_auv_out[1] > y_field[-1]:
         x_auv_out[1] = y_field[-1]
+        if 0 < x_auv_out[2] < pi/2:
+            x_auv_out[2] = 1.99*pi
+        if pi/2 < x_auv_out[2] < pi:
+           x_auv_out[2] = 1.01*pi
+
     if x_auv_out[2] > 2*pi:
-        x_auv_out[2] = x_auv[2] - 2*pi
+        a_pi = int(x_auv_out[2]/2*pi)
+        x_auv_out[2] = x_auv_out[2] - a_pi*2*pi
 
     return x_auv_out
 
@@ -306,7 +328,7 @@ F = np.ones(shape=(n, p))  # Mean regression functions
 T = 1e-6 * np.ones(shape=(p, p))  # Precision matrix of the regression coefficients
 sigma_w_squ = 0.2 ** 2  # Measurement variance
 sample_time_gmrf = 100  # Sample/Calculation time in ms of GMRF algorithm
-simulation_end_time = 10000  # Run time of simulation in ms
+simulation_end_time = 20000  # Run time of simulation in ms
 
 """#######################################"""
 """Choose control parameters"""
@@ -320,9 +342,9 @@ n_horizon = 15  # Control horizon length in s
 N_horizon = 15  # Number of discrete rollout points
 t_cstep = n_horizon / N_horizon  # Control horizon step size in s
 sigma_epsilon = pi / 8  # Exploration noise in radians, 90 grad = 1,57
-n_updates = 10  # Control loop updates
-R_cost = 10 * np.ones(shape=(1, 1))  # Immediate control cost
-
+n_updates = 15  # Control loop updates
+R_cost = 5 * np.ones(shape=(1, 1))  # Immediate control cost
+wg = 0  # Cost factor for tank border distance cost
 """#######################################"""
 """Define plot parameters"""
 vmin = np.amin(z_field) - 0.5  # Minimum plotted mean and true field value?
@@ -423,13 +445,12 @@ else:
         Q_t2 = load_sparse_csr(filename)
         filename2 = "Q_t_" + str(j2)
         save_sparse_csr(filename2, Q_t2)
-
     diag_Q_t_inv = np.load('diag_Q_t_inv.npy')
     del T_sparse, F_sparse, FT_sparse
 
 
 """Initialize matrices and vectors"""
-b = np.zeros(shape=(n+p, 1)) # Canonical mean
+b = np.zeros(shape=(n+p, 1))  # Canonical mean
 c = 0.0  # Log-likelihood update vector
 h_theta = np.zeros(shape=(n+p, l_TH))
 g_theta = np.zeros(shape=(l_TH, 1))
@@ -455,6 +476,7 @@ tau_x = np.zeros(shape=(len(x_auv), N_horizon, n_k))
 tau_optimal = np.zeros(shape=(len(x_auv), N_horizon))
 var_x_tau = np.zeros(shape=(N_horizon, n_k))
 control_cost = np.zeros(shape=(N_horizon, n_k))
+border_cost = np.zeros(shape=(N_horizon, n_k))
 exp_lambda_S = np.zeros(shape=(N_horizon, n_k))
 S_tau = np.zeros(shape=(N_horizon, n_k))
 P_tau = np.zeros(shape=(N_horizon, n_k))
@@ -523,14 +545,22 @@ for time_in_ms in range(0, simulation_end_time):  # 1200 ms sekunden
             """Calculate observation precision (?)"""
             filename = "Q_t_" + str(jj)
             Q_t = load_sparse_csr(filename)
+            #perm = scipy.sparse.csgraph.reverse_cuthill_mckee(Q_t, symmetric_mode=True)
             h_theta[:, jj] = scipy.sparse.linalg.spsolve(Q_t, u_sparse).T
             """Update Precision Matrix"""
             diag_Q_t_inv[:, jj] = np.subtract(diag_Q_t_inv[:, jj],  (np.multiply(h_theta[:, jj], h_theta[:, jj]) / (sigma_w_squ + np.dot(u.T, h_theta[:, jj]))))
             Q_t = Q_t + (1 / sigma_w_squ) * u_sparse.dot(u_sparse.T)
             save_sparse_csr(filename, Q_t)
 
+            # Check precision matrix
+            #my_data = Q_t.todense()
+            #my_data[my_data == 0.0] = np.nan
+            #plt.matshow(my_data, cmap=cm.Spectral_r, interpolation='none')
+            #plt.show()
+
             g_theta[jj] = g_theta[jj] - (0.5 * np.log(1 + (1 / sigma_w_squ) * np.dot(u.T, h_theta[:, jj])))
         # End for-slope for all N observation at time t
+
 
         for hh in range(0, l_TH):
             """Compute canonical mean"""
@@ -553,7 +583,7 @@ for time_in_ms in range(0, simulation_end_time):  # 1200 ms sekunden
         stored_var_x[:, [n_storage]] = var_x
         stored_phi_theta[:, [n_storage]] = pi_theta
         time_4 = time.time()
-        print("--- %s seconds --- GMRF algorithm time" % (time_4 - time_3))
+        print("--- %s seconds --- GMRF time" % (time_4 - time_3))
         n_storage += 1
 
 
@@ -562,8 +592,10 @@ for time_in_ms in range(0, simulation_end_time):  # 1200 ms sekunden
         """PATH INTEGRAL CONTROL"""
         u_optimal[:-1] = u_optimal[1:]
         u_optimal[-1] = 0
+        #u_optimal = np.zeros(shape=(N_horizon, 1))
 
         for ii in range(0, n_updates):  # Repeat PI algorithm for convergence
+            """Sample trajectories"""
             for jj in range(0, n_k):  # Iterate over all trajectories
                 tau_x[:, 0, jj] = x_auv  # Set initial trajectory state
                 # Calculate exploration noise (Only PI-Controller Hyperparameter)
@@ -571,47 +603,71 @@ for time_in_ms in range(0, simulation_end_time):  # 1200 ms sekunden
 
                 for kk in range(0, N_horizon-1):  # Iterate over length of trajectory except of last entry
                     # Sample roll-out trajectory
-                    print(kk,tau_x[:, 0, jj],'x_auv', x_auv)
                     tau_x[:, kk+1, jj] = auv_dynamics(v_auv, tau_x[:, kk, jj], u_optimal[kk], epsilon_auv[kk, jj], t_cstep)
 
                 for kk in range(0, N_horizon):  # Iterate over length of trajectory
+                    """Calculate cost"""
                     #g_m = np.array(1)
                     #M_m = (1 / np.dot(g_m.T, R_cost_inv.dot(g_m))) * np.dot(R_cost_inv, np.dot(g_m, g_m.T))
                     # Compute variance along sampled trajectory
                     M_m = 1  # Only for p=1 and this simple state model !
                     A_z, numb_ind = interpolation_matrix(tau_x[:, kk, jj])
-                    var_x_tau[kk, jj] = np.dot(A_z.T, var_x)
+                    var_x_tau[kk, jj] = 1/np.dot(A_z.T, var_x)
+                    d1 = np.absolute(x_field[-1] - tau_x[0, kk, jj])
+                    d2 = np.absolute(y_field[-1] - tau_x[1, kk, jj])
+                    d3 = np.absolute(x_field[0] - tau_x[0, kk, jj])
+                    d4 = np.absolute(y_field[0] - tau_x[1, kk, jj])
+                    border_cost[kk, jj] = wg*np.exp(-d1/2) + wg*np.exp(-d2/2) + wg*np.exp(-d3/2) + wg*np.exp(-d4/2)
                     control_cost[kk, jj] = 0.5 * np.dot(np.array(u_optimal[kk]+epsilon_auv[kk, jj]).T,
                                                         np.dot(R_cost, np.array(u_optimal[kk]+epsilon_auv[kk, jj])))
 
                 for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
-                    S_tau[kk, jj] = np.sum(var_x_tau[kk:, jj]) + np.sum(control_cost[kk:, jj])
+                    S_tau[kk, jj] = np.sum(var_x_tau[kk:, jj]) + np.sum(border_cost[kk:, jj]) + np.sum(control_cost[kk:, jj])
                 for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
                     exp_lambda_S[kk, jj] = exp(-10 * (S_tau[kk, jj] - np.amin(S_tau[:, jj])) /
                                                (np.amax(S_tau[:, jj]) - np.amin(S_tau[:, jj])))
 
             u_correction = np.zeros(shape=(N_horizon, 1))
             for kk in range(0, N_horizon):  # Iterate over length of trajectory
+
                 for jj in range(0, n_k):  # Iterate over all trajectories
+                    # Roll-Out probability
                     P_tau[kk, jj] = exp_lambda_S[kk, jj] / np.sum(exp_lambda_S[kk, :])
+
                 for jj in range(0, n_k):  # Iterate over all trajectories
                     u_correction[kk] += P_tau[kk, jj] * M_m * epsilon_auv[kk, jj]
-
             u_optimal = u_optimal + u_correction
 
-
+        # PI Sanity check
         tau_optimal[:, 0] = x_auv
+        var_x_test = np.zeros(shape=(N_horizon, 1))
+        control_cost_test = np.zeros(shape=(N_horizon, 1))
+        border_cost_test = np.zeros(shape=(N_horizon, 1))
         for kk in range(0, N_horizon - 1):  # Iterate over length of trajectory except of last entry
-            tau_optimal[:, kk + 1] = auv_dynamics(v_auv, tau_x[:, kk, jj], u_optimal[kk], 0, t_cstep)
+            tau_optimal[:, kk + 1] = auv_dynamics(v_auv, tau_optimal[:, kk], u_optimal[kk], 0, t_cstep)
+        for kk in range(0, N_horizon):  # Iterate over length of trajectory except of last entry
+            A_test, numb_ind = interpolation_matrix(tau_optimal[:, kk])
+            var_x_test[kk] = 1 / np.dot(A_test.T, var_x)
+            control_cost_test[kk] = 0.5 * np.dot(np.array(u_optimal[kk]).T,
+                                            np.dot(R_cost, np.array(u_optimal[kk])))
 
-        # Random Walk
+            border_cost_test[kk] = wg*np.exp(-(np.absolute(x_field[-1] - tau_optimal[0, kk]))/2) + \
+                                   wg*np.exp(-(np.absolute(y_field[-1] - tau_optimal[1, kk]))/2) + \
+                                   wg*np.exp(-(np.absolute(x_field[0] - tau_optimal[0, kk]))/2) + \
+                                   wg*np.exp(-(np.absolute(y_field[0] - tau_optimal[1, kk]))/2)
+        #print('var_check', var_x_test, 'control_check', control_cost_test, 'border_check' ,border_cost_test)
+        # print('var_check', var_x_test, 'control_check', control_cost_test)
+
+        #  Random Walk
         #u_auv = ((0.2 * pi) / 1000) * randint(-500, 500)  # Control input for random walk
         #x_auv = auv_dynamics(v_auv, x_auv, u_auv, 0.01)
 
+        time_5 = time.time()
+        print("--- %s seconds --- PI time" % (time_5 - time_4))
 
-        """#####################################################################################"""
-        """PLOT RESULTS"""
-        # Transform mean and variance into matrix for scatter
+        # """#####################################################################################"""
+        # """PLOT RESULTS"""
+        # # Transform mean and variance into matrix for scatter
         xv, yv = np.meshgrid(x_grid, y_grid)
         mue_x_plot = mue_x[0:(lx * ly)].reshape((ly, lx))
         var_x_plot = var_x[0:(lx * ly)].reshape((ly, lx))
@@ -619,8 +675,6 @@ for time_in_ms in range(0, simulation_end_time):  # 1200 ms sekunden
         xv_list = xv.reshape((lx * ly, 1))
         yv_list = yv.reshape((lx * ly, 1))
         labels = ['{0}'.format(i) for i in range(lx * ly)]  # Labels for annotating GMRF nodes
-
-        # fig1 = plt.figure(figsize=(8, 3))
 
         """Plot True Field"""
         ax0 = fig1.add_subplot(221)
@@ -636,7 +690,7 @@ for time_in_ms in range(0, simulation_end_time):  # 1200 ms sekunden
                               mue_x_plot, vmin=vmin, vmax=vmax, levels=levels)
             plt.scatter(xv, yv, marker='+', facecolors='dimgrey')
             plt.plot([x_min, x_min, x_max, x_max, x_min], [y_min, y_max, y_max, y_min, y_min], "k")
-            plt.plot(s_obs[1], s_obs[0], marker='o', markerfacecolor='none')
+            plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
 
             if LabelVertices == True:
                 # Label GMRF vertices
