@@ -26,21 +26,22 @@ sample_time_gmrf = 100  # Sample/Calculation time in ms of GMRF algorithm
 simulation_end_time = 20000  # Run time of simulation in ms
 
 
-"""Choose GMRF simulation parameters"""
+"""Choose GMRF parameters"""
 gmrf_dim = [50, 25, 15, 15]  # lxf, lyf, dvx, dvy
-set_GMRF_cartype = False  # Use car(1)? <-> True, Default is car(2) from Choi et al
 set_Q_init = True  # Re-Calculate precision matrix at Initialization? False: Load stored precision matrix
-set_sanity_check = True  # Calculates cost for the optimal path and plots the optimal path
-set_prior = 2  # Choose prior case from below
+set_Q_check = False  # Plots Q matrix entries inside GMRF algorithm
+set_gmrf_torus = False  # True -w> GMRF uses torus boundary condition, False -> GMRF uses Neumann-BC
+set_GMRF_cartype = True  # Use car(1)? <-> True, Default is car(2) from Choi et al
+set_prior = 1  # Choose prior case from below
 if set_GMRF_cartype == False:
     if set_prior == 1:
-        # Choi paper
-        kappa_prior = np.array([0.0625 * (2 ** 0), 0.0625 * (2 ** 2), 0.0625 * (2 ** 4), 0.0625 * (2 ** 6), 0.0625 * (2 ** 8)]).astype(float)
-        alpha_prior = np.array([0.000625 * (1 ** 2), 0.000625 * (2 ** 2), 0.000625 * (4 ** 2), 0.000625 * (8 ** 2), 0.000625 * (16 ** 2)]).astype(float)
-    elif set_prior == 2:
         # Choi Parameter (size 1)
         kappa_prior = np.array([0.0625 * (2 ** 4)]).astype(float)
         alpha_prior = np.array([0.000625 * (4 ** 2)]).astype(float)
+    elif set_prior == 2:
+        # Choi paper
+        kappa_prior = np.array([0.0625 * (2 ** 0), 0.0625 * (2 ** 2), 0.0625 * (2 ** 4), 0.0625 * (2 ** 6), 0.0625 * (2 ** 8)]).astype(float)
+        alpha_prior = np.array([0.000625 * (1 ** 2), 0.000625 * (2 ** 2), 0.000625 * (4 ** 2), 0.000625 * (8 ** 2), 0.000625 * (16 ** 2)]).astype(float)
     elif set_prior == 3:
         # Choi Parameter (size 2)
         kappa_prior = np.array([0.0625 * (2 ** 2), 0.0625 * (2 ** 4)]).astype(float)
@@ -57,97 +58,84 @@ elif set_GMRF_cartype == True:
     if set_prior == 1:
         # Solowjow Parameter for CAR(1) (size 1)
         kappa_prior = np.array([1]).astype(float)
-        alpha_prior = np.array([0.01]).astype(float)
+        alpha_prior = np.array([0.001]).astype(float)
     elif set_prior == 2:
-        # Same theta values (size 5)
-        kappa_prior = np.array([0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4)]).astype(float)
-        alpha_prior = np.array([0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2)]).astype(float)
+        # Same theta values (size 3)
+        kappa_prior = np.array([0.5, 1, 2]).astype(float)
+        alpha_prior = np.array([0.01]).astype(float)
     elif set_prior == 3:
-        # Same theta values (size 10)
-        kappa_prior = np.array([0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4), 0.0625 * (2 ** 4)]).astype(float)
-        alpha_prior = np.array([0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2), 0.000625 * (4 ** 2)]).astype(float)
+        kappa_prior = np.array([1, 1.2]).astype(float)
+        alpha_prior = np.array([0.0001, 0.001, 0.01]).astype(float)
+    elif set_prior == 4:
+        kappa_prior = np.array([0.8, 1, 1.2]).astype(float)
+        alpha_prior = np.array([0.001, 0.01, 0.1]).astype(float)
+    elif set_prior == 5:
+        kappa_prior = np.array([1]).astype(float)
+        alpha_prior = np.array([3, 1, 0.5, 0.3, 0.1, 0.01]).astype(float)
 
 """Choose control parameters"""
-n_updates = 15  # Control loop updates
+set_sanity_check = True  # Calculates cost for the optimal path and plots the optimal path
+n_updates = 10  # Control loop updates
 n_k = 15  # Number of virtual roll-out pathes
-n_horizon = 15  # Control horizon length in s
-N_horizon = 15  # Number of discrete rollout points
+n_horizon = 10  # Control horizon length in s
+N_horizon = 10  # Number of discrete rollout points
 t_cstep = n_horizon / N_horizon  # Control horizon step size in s
-sigma_epsilon = scipy.pi / 8  # Exploration noise in radians, 90 grad = 1,57
+sigma_epsilon = scipy.pi / 16  # Exploration noise in radians, 90 grad = 1,57
 R_cost = 5 * np.ones(shape=(1, 1))  # Immediate control cost
-
+border_variance_penalty = 5
 pi_parameters = (n_updates, n_k, n_horizon, N_horizon, t_cstep, sigma_epsilon, R_cost)
 
 #################################################################################################
 """DEFINE GENERAL FUNCTIONS"""
-# Calculate TEMPERATURE FIELD (Ground truth)
-def true_field(set_field):
-    if set_field == True:
-        """Analytic field"""
-        z = np.array([[10, 10.625, 12.5, 15.625, 20],
-                      [5.625, 6.25, 8.125, 11.25, 15.625],
-                      [3, 3.125, 4, 12, 12.5],
-                      [5, 2, 3.125, 10, 10.625],
-                      [5, 8, 11, 12, 10]])
-        X = np.atleast_2d([0, 2, 4, 6, 10])  # Specifies column coordinates of field
-        Y = np.atleast_2d([0, 1, 3, 4, 5])  # Specifies row coordinates of field
-        x_field = np.arange(field_dim[0], field_dim[1], 1e-2)
-        y_field = np.arange(field_dim[2], field_dim[3], 1e-2)
-        f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
-        z_field = f(x_field, y_field)
-        return x_field, y_field, z_field
-    if set_field == False:
-        """Field from GMRF"""
-        car_var = [False]  # Use car(1)?
-        kappa_field = [1]  # Kappa for Choi CAR(2) true field/ Solowjow et. al CAR(1)
-        alpha_field = [0.01]  # Alpha for Choi CAR(2) true field/ Solowjow et. al CAR(1)
-
-        z = sample_from_GMRF(lx, ly, kappa_field, alpha_field, car_var, 'True')  # GMRF as in paper
-        X = np.linspace(xg_min, xg_max, num=lx, endpoint=True)  # Specifies column coordinates of field
-        Y = np.linspace(yg_min, yg_max, num=ly, endpoint=True)  # Specifies row coordinates of field
-        f = sci.interpolate.interp2d(X, Y, z, kind='cubic')
-
-        x_field = np.arange(x_min, x_max, 1e-2)
-        y_field = np.arange(y_min, y_max, 1e-2)
-        z_field = f(x_field, y_field)
-        return x_field, y_field, z_field
 
 # AUV model
-def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_limits):
+def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_limits, set_border = True):
     x_auv_out = np.zeros(shape=(3))
 
     x_auv_out[2] = x_auv[2] + u_auv * delta_t + epsilon_a * sqrt(delta_t)
     x_auv_out[0] = x_auv[0] + v_auv * cos(x_auv_out[2]) * delta_t
     x_auv_out[1] = x_auv[1] + v_auv * sin(x_auv_out[2]) * delta_t
 
-    # Prevent AUV from leaving the true field
-    if x_auv_out[0] < 0:
-        x_auv_out[0] = 0
-        if pi / 2 < x_auv_out[2] < pi:
-            x_auv_out[2] = 0.49 * pi
-        if pi < x_auv_out[2] < 1.5 * pi:
-            x_auv_out[2] = 1.51 * pi
+    if set_border == True:
+        # Prevent AUV from leaving the true field
+        if x_auv_out[0] < 0:
+            x_auv_out[0] = 0
 
-    if x_auv_out[1] < 0:
-        x_auv_out[1] = 0
-        if pi < x_auv_out[2] < 1.49 * pi:
-            x_auv_out[2] = pi
-        if 1.5 * pi < x_auv_out[2] <= 2 * pi:
-            x_auv_out[2] = 0.01
+        if x_auv_out[1] < 0:
+            x_auv_out[1] = 0
 
-    if x_auv_out[0] > field_limits[0]:
-        x_auv_out[0] = field_limits[0]
-        if 0 < x_auv_out[2] < pi / 2:
-            x_auv_out[2] = 0.51 * pi
-        if 1.5 * pi < x_auv_out[2] <= 2 * pi:
-            x_auv_out[2] = 1.49 * pi
+        if x_auv_out[0] > field_limits[0]:
+            x_auv_out[0] = field_limits[0]
 
-    if x_auv_out[1] > field_limits[1]:
-        x_auv_out[1] = field_limits[1]
-        if 0 < x_auv_out[2] < pi / 2:
-            x_auv_out[2] = 1.99 * pi
-        if pi / 2 < x_auv_out[2] < pi:
-            x_auv_out[2] = 1.01 * pi
+        if x_auv_out[1] > field_limits[1]:
+            x_auv_out[1] = field_limits[1]
+        # if x_auv_out[0] < 0:
+        #     x_auv_out[0] = 0
+        #     if pi / 2 < x_auv_out[2] < pi:
+        #         x_auv_out[2] = 0.49 * pi
+        #     if pi < x_auv_out[2] < 1.5 * pi:
+        #         x_auv_out[2] = 1.51 * pi
+        #
+        # if x_auv_out[1] < 0:
+        #     x_auv_out[1] = 0
+        #     if pi < x_auv_out[2] < 1.49 * pi:
+        #         x_auv_out[2] = pi
+        #     if 1.5 * pi < x_auv_out[2] <= 2 * pi:
+        #         x_auv_out[2] = 0.01
+        #
+        # if x_auv_out[0] > field_limits[0]:
+        #     x_auv_out[0] = field_limits[0]
+        #     if 0 < x_auv_out[2] < pi / 2:
+        #         x_auv_out[2] = 0.51 * pi
+        #     if 1.5 * pi < x_auv_out[2] <= 2 * pi:
+        #         x_auv_out[2] = 1.49 * pi
+        #
+        # if x_auv_out[1] > field_limits[1]:
+        #     x_auv_out[1] = field_limits[1]
+        #     if 0 < x_auv_out[2] < pi / 2:
+        #         x_auv_out[2] = 1.99 * pi
+        #     if pi / 2 < x_auv_out[2] < pi:
+        #         x_auv_out[2] = 1.01 * pi
 
     if x_auv_out[2] > 2 * pi:
         a_pi = int(x_auv_out[2] / 2 * pi)

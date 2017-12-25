@@ -15,7 +15,7 @@ import plot_scripts
 
 import time
 import scipy
-from scipy import exp, sin, cos, sqrt, pi, interpolate
+from scipy import sqrt
 #import matplotlib.pyplot as plt
 #from matplotlib import cm
 #from matplotlib.lines import Line2D
@@ -25,14 +25,50 @@ import numpy as np
 # AUV starting state
 x_auv = Config.x_auv
 
-# Initialize Field
-x_field, y_field, z_field = Config.true_field(True)
-field_limits = (x_field[-1], y_field[-1])
+"""Initialize Field"""
+# Calculate TEMPERATURE FIELD (Ground truth)
+def true_field(set_field):
+    if set_field == True:
+        """Analytic field"""
+        # z = np.array([[10, 10.625, 12.5, 15.625, 20],
+        #               [5.625, 6.25, 8.125, 11.25, 15.625],
+        #               [3, 3.125, 4, 12, 12.5],
+        #               [5, 2, 3.125, 10, 10.625],
+        #               [5, 8, 11, 12, 10]])
+        z = np.array([[2, 4, 6, 7, 8],
+                      [2.1, 5, 7, 11.25, 9.5],
+                      [3, 5.6, 8.5, 17, 14.5],
+                      [2.5, 5.4, 6.9, 9, 8],
+                      [2, 2.3, 4, 6, 7.5]])
+        X = np.atleast_2d([0, 2, 4, 6, 10])  # Specifies column coordinates of field
+        Y = np.atleast_2d([0, 1, 3, 4, 5])  # Specifies row coordinates of field
+        x_field = np.arange(Config.field_dim[0], Config.field_dim[1], 1e-2)
+        y_field = np.arange(Config.field_dim[2], Config.field_dim[3], 1e-2)
+        f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
+        z_field = f(x_field, y_field)
+        return x_field, y_field, z_field
+    if set_field == False:
+        """Field from GMRF"""
+        car_var = False
+        kappa_field = [1]  # Kappa
+        alpha_field = [0.01]  # Alpha
 
+        f = gp_scripts.sample_from_GMRF(Config.gmrf_dim, kappa_field, alpha_field, car_var, plot_gmrf=False)
+
+        x_field = np.arange(Config.field_dim[0], Config.field_dim[1], 1e-2)
+        y_field = np.arange(Config.field_dim[2], Config.field_dim[3], 1e-2)
+        z_field = f(x_field, y_field)
+        return x_field, y_field, z_field
+
+
+x_field, y_field, z_field = true_field(False)
+field_limits = (x_field[-1], y_field[-1])
+print("field", np.amin(z_field), np.amax(z_field))
 # Calculate and set plot parameters
-plot_settings = {"vmin":np.amin(z_field) - 0.5, "vmax":np.amax(z_field) + 0.5, "var_min":0,
-                 "var_max":5, "levels":np.linspace(np.amin(z_field) - 0.5, np.amax(z_field) + 0.5, 20),
+plot_settings = {"vmin":np.amin(z_field) - 0.1, "vmax":np.amax(z_field) + 0.1, "var_min":0,
+                 "var_max":3, "levels":np.linspace(np.amin(z_field) - 0.1, np.amax(z_field) + 0.1, 20),
                  "PlotField":False, "LabelVertices":True}
+
 # Initialize plots
 fig1, hyper_x, hyper_y, bottom, colors, trajectory_1 = plot_scripts.initialize_animation1(x_field, y_field, z_field, x_auv, **plot_settings)
 
@@ -63,6 +99,7 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms sekunden
         mue_x, var_x, pi_theta = gmrf1.gmrf_bayese_update(x_auv, y_t)
         time_4 = time.time()
         print("Calc. time GMRF: /", "{0:.2f}".format(time_4-time_3))
+        print("var_x: ",var_x)
 
         # Calculate optimal control path
         u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
@@ -73,19 +110,4 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms sekunden
         plot_scripts.update_animation1(pi_theta, fig1, hyper_x, hyper_y, bottom, colors, x_field, y_field, z_field, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
         time_6 = time.time()
         print("Calc. time Plot: /", "{0:.2f}".format(time_6-time_5))
-
-    #     # Store plot values"""
-    #     stored_mue_x[:, [n_storage]] = mue_x
-    #     stored_var_x[:, [n_storage]] = var_x
-    #     #store_var_median_iqr[0, [n_storage]] = np.median(var_x)
-    #     #store_var_median_iqr[1, [n_storage]] = np.median(var_x)
-    #     #store_var_median_iqr[2, [n_storage]] = np.median(var_x)
-    #
-    #     stored_phi_theta[:, [n_storage]] = pi_theta
-    #     time_4 = time.time()
-    #     print("--- %s seconds --- GMRF time" % (time_4 - time_3))
-    #     n_storage += 1
-
-    #     time_5 = time.time()
-    #     print("--- %s seconds --- PI time" % (time_5 - time_4))
 

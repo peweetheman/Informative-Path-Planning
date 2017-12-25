@@ -22,7 +22,7 @@ def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_lim
     epsilon_auv = np.zeros(shape=(N_horizon, n_k))
     tau_x = np.zeros(shape=(len(x_auv), N_horizon, n_k))
     tau_optimal = np.zeros(shape=(len(x_auv), N_horizon))
-    var_x_tau = np.zeros(shape=(N_horizon, n_k))
+    pre_x_tau = np.zeros(shape=(N_horizon, n_k))
     control_cost = np.zeros(shape=(N_horizon, n_k))
     exp_lambda_S = np.zeros(shape=(N_horizon, n_k))
     S_tau = np.zeros(shape=(N_horizon, n_k))
@@ -42,19 +42,27 @@ def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_lim
 
             for kk in range(0, N_horizon-1):  # Iterate over length of trajectory except of last entry
                 # Sample roll-out trajectory
-                tau_x[:, kk+1, jj] = Config.auv_dynamics(tau_x[:, kk, jj], u_optimal[kk], epsilon_auv[kk, jj], t_cstep, field_limits)
+                tau_x[:, kk+1, jj] = Config.auv_dynamics(tau_x[:, kk, jj], u_optimal[kk], epsilon_auv[kk, jj], t_cstep,
+                                                         field_limits, set_border=False)
 
             """Calculate cost and probability weighting"""
             for kk in range(0, N_horizon):  # Iterate over length of trajectory
                 # Compute variance along sampled trajectory
                 M_m = 1  # Only for p=1 and this simple state model !
-                A_z = Config.interpolation_matrix(tau_x[:, kk, jj], n, p, lx, xg_min, yg_min, de)
-                var_x_tau[kk, jj] = 1/np.dot(A_z.T, var_x)
-                control_cost[kk, jj] = 0.5 * np.dot(np.array(u_optimal[kk]+epsilon_auv[kk, jj]).T,
-                                                    np.dot(R_cost, np.array(u_optimal[kk]+epsilon_auv[kk, jj])))
+                #if M_m == 1:
+                 #   print('Tau', tau_x[0:2, kk, jj], 'FL', field_limits)
+                if not (0 <= tau_x[0, kk, jj] <= field_limits[0]) or not (0 <= tau_x[1, kk, jj] <= field_limits[1]):
+                    #print('Tau', tau_x[0:2, kk, jj], 'FL', field_limits)
+                    pre_x_tau[kk, jj] = Config.border_variance_penalty
+                    control_cost[kk, jj] = 0
+                else:
+                    A_z = Config.interpolation_matrix(tau_x[:, kk, jj], n, p, lx, xg_min, yg_min, de)  #
+                    pre_x_tau[kk, jj] = 1/np.dot(A_z.T, var_x)
+                    control_cost[kk, jj] = 0.5 * np.dot(np.array(u_optimal[kk]+epsilon_auv[kk, jj]).T,
+                                                        np.dot(R_cost, np.array(u_optimal[kk]+epsilon_auv[kk, jj])))
 
             for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
-                S_tau[kk, jj] = np.sum(var_x_tau[kk:, jj]) + np.sum(control_cost[kk:, jj])
+                S_tau[kk, jj] = np.sum(pre_x_tau[kk:, jj]) + np.sum(control_cost[kk:, jj])
             for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
                 exp_lambda_S[kk, jj] = exp(-10 * (S_tau[kk, jj] - np.amin(S_tau[:, jj])) /
                                            (np.amax(S_tau[:, jj]) - np.amin(S_tau[:, jj])))
