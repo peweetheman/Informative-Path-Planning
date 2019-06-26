@@ -30,7 +30,7 @@ simulation_end_time = 20000  # Run time of simulation in ms
 gmrf_dim = [50, 25, 15, 15]  # lxf, lyf, dvx, dvy
 set_Q_init = True  # Re-Calculate precision matrix at Initialization? False: Load stored precision matrix
 set_Q_check = False  # Plots Q matrix entries inside GMRF algorithm
-set_gmrf_torus = False  # True -w> GMRF uses torus boundary condition, False -> GMRF uses Neumann-BC
+set_gmrf_torus = True  # True -w> GMRF uses torus boundary condition, False -> GMRF uses Neumann-BC
 set_GMRF_cartype = True  # Use car(1)? <-> True, Default is car(2) from Choi et al
 set_prior = 1  # Choose prior case from below
 if set_GMRF_cartype == False:
@@ -76,7 +76,7 @@ elif set_GMRF_cartype == True:
 """Choose control parameters"""
 set_sanity_check = True  # Calculates cost for the optimal path and plots the optimal path
 n_updates = 10  # Control loop updates
-n_k = 15  # Number of virtual roll-out pathes
+n_k = 10  # Number of virtual roll-out pathes
 n_horizon = 10  # Control horizon length in s
 N_horizon = 10  # Number of discrete rollout points
 t_cstep = n_horizon / N_horizon  # Control horizon step size in s
