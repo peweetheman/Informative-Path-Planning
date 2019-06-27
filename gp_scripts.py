@@ -17,7 +17,8 @@ from scipy import exp, sin, cos, sqrt, pi, interpolate
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 from matplotlib import cm
-#from scikits.sparse.cholmod import cholesky
+
+# from scikits.sparse.cholmod import cholesky
 
 
 """Define sparse matrix save and load"""
@@ -86,39 +87,51 @@ def calculate_precision_matrix(lx, ly, kappa, alpha, car1=False):
 				# Check if field vertice is inside field, on border or in corner of field
 				# To define its neighbours
 				if (ii + 2) <= (ly - 1):
-					a1 = ii + 1; a2 = ii + 2
+					a1 = ii + 1;
+					a2 = ii + 2
 				# If moving two fields upwards in y-direction does not result in leaving the field
 				# The uper field neighbours "a1" and "a2" are directly above the vertice being a1=ii+1; a2=ii+2
 				elif (ii + 1) <= (ly - 1):
-					a1 = ii + 1; a2 = 0
+					a1 = ii + 1;
+					a2 = 0
 				# If moving two fields upwards in y-direction does result in a2 leaving the field
 				# The uper field neighbour "a1" is still inside field, but "a2" is due to the torus topology now a2=0
 				else:
-					a1 = 0; a2 = 1
+					a1 = 0;
+					a2 = 1
 				# If moving one field upwards in y-direction does result in leaving the field (ii is on upper field border)
 				# The uper field neighbour is in in y-direction with "a1" and "a2" due to the torus topology now  a1=0 and a2=1
 
 				if (ii - 2) >= 0:
-					b1 = ii - 1; b2 = ii - 2
+					b1 = ii - 1;
+					b2 = ii - 2
 				elif (ii - 1) >= 0:
-					b1 = ii - 1; b2 = ly - 1
+					b1 = ii - 1;
+					b2 = ly - 1
 				else:
-					b1 = ly - 1; b2 = ly - 2
+					b1 = ly - 1;
+					b2 = ly - 2
 
 				if (jj + 2) <= (lx - 1):
-					c1 = jj + 1; c2 = jj + 2
+					c1 = jj + 1;
+					c2 = jj + 2
 				elif (jj + 1) <= (lx - 1):
-					c1 = jj + 1; c2 = 0
+					c1 = jj + 1;
+					c2 = 0
 				else:
-					c1 = 0; c2 = 1
+					c1 = 0;
+					c2 = 1
 
 				if (jj - 2) >= 0:
-					d1 = jj - 1; d2 = jj - 2
+					d1 = jj - 1;
+					d2 = jj - 2
 				elif (jj - 1) >= 0:
-					d1 = jj - 1; d2 = lx - 1
+					d1 = jj - 1;
+					d2 = lx - 1
 				else:
-					d1 = lx - 1; d2 = lx - 2
-				#                                        field i,j              a1,j             b1,j               i,c1             i,d1
+					d1 = lx - 1;
+					d2 = lx - 2
+				# field i,j              a1,j             b1,j               i,c1             i,d1
 				infmat[field_info[ii, jj], :] = np.array([field_info[ii, jj], field_info[a1, jj], field_info[b1, jj], field_info[ii, c1], field_info[ii, d1],
 														  #               a2,j             b2,j               i,c2             i,d2
 														  field_info[a2, jj], field_info[b2, jj], field_info[ii, c2], field_info[ii, d2],
