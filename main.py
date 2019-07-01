@@ -11,6 +11,7 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 import Config
 import gp_scripts
 import control_scripts
+import RRT_star
 import plot_scripts
 from true_field import true_field
 import time
@@ -60,7 +61,8 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms sekunden
 		print("Calc. time GMRF: /", "{0:.2f}".format(time_4 - time_3))
 
 		# Calculate optimal control path
-		u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
+		# u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
+
 		time_5 = time.time()
 		print("Calc. time PI: /", "{0:.2f}".format(time_5 - time_4))
 

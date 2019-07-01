@@ -79,12 +79,14 @@ def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_lim
 		u_optimal = u_optimal + u_correction
 
 	"""PI Sanity check"""
+
 	if set_sanity_check == True:
 		tau_optimal[:, 0] = x_auv
 		var_x_test = np.zeros(shape=(N_horizon, 1))
 		control_cost_test = np.zeros(shape=(N_horizon, 1))
 		for kk in range(0, N_horizon - 1):  # Iterate over length of trajectory except of last entry
 			tau_optimal[:, kk + 1] = Config.auv_dynamics(tau_optimal[:, kk], u_optimal[kk], 0, t_cstep, field_limits)
+
 		for kk in range(0, N_horizon):  # Iterate over length of trajectory except of last entry
 			A_test = Config.interpolation_matrix(tau_optimal[:, kk], n, p, lx, xg_min, yg_min, de)
 			var_x_test[kk] = 1 / np.dot(A_test.T, var_x)
