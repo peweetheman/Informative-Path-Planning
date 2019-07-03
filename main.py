@@ -11,7 +11,7 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 import Config
 import gp_scripts
 import control_scripts
-import RRT_star
+from RRT_star import RRT_star
 import plot_scripts
 from true_field import true_field
 import time
@@ -47,6 +47,7 @@ u_optimal = np.zeros(shape=(Config.N_horizon, 1))
 for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms sekunden
 	if time_in_ms % Config.sample_time_gmrf < 0.0000001:
 		# Calculate next AUV state
+		print("u opt 0: ", u_optimal)
 		x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, field_limits)
 		trajectory_1 = np.vstack([trajectory_1, x_auv])
 
@@ -62,6 +63,10 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms sekunden
 
 		# Calculate optimal control path
 		# u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
+
+		rrt_star = RRT_star(start=x_auv, space=[0, 30], obstacles=None)
+		path, u_optimal, tau_optimal = rrt_star.rrt_star_algorithm()
+		tau_x = []
 
 		time_5 = time.time()
 		print("Calc. time PI: /", "{0:.2f}".format(time_5 - time_4))

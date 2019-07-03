@@ -91,7 +91,7 @@ pi_parameters = (n_updates, n_k, n_horizon, N_horizon, t_cstep, sigma_epsilon, R
 # AUV model
 def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_limits, set_border=True):
 	x_auv_out = np.zeros(shape=3)
-
+	print("control: ", u_auv)
 	x_auv_out[2] = x_auv[2] + u_auv * delta_t + epsilon_a * sqrt(delta_t)  # computes angle
 	x_auv_out[0] = x_auv[0] + v_auv * cos(x_auv_out[2]) * delta_t
 	x_auv_out[1] = x_auv[1] + v_auv * sin(x_auv_out[2]) * delta_t

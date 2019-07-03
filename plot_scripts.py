@@ -147,8 +147,10 @@ def update_animation1(pi_theta, fig1, x, y, bottom, colors, true_field, x_auv, m
 						  var_x_plot[dvy:(lyf + dvy), dvx:(lxf + dvx)], 10, vmin=var_min, vmax=var_max)
 		# plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
 		plt.plot(trajectory_1[:, 0], trajectory_1[:, 1], color='yellow')
+
 		for jj in range(0, Config.n_k):  # Iterate over all trajectories
-			plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
+			pass
+			# plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
 		plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
 		plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
 
@@ -156,7 +158,7 @@ def update_animation1(pi_theta, fig1, x, y, bottom, colors, true_field, x_auv, m
 	ax3 = fig1.add_subplot(224, projection='3d')
 	ax3.set_title("Hyperparameter estimate")
 	# colors = plt.cm.jet(pi_theta.flatten() / float(pi_theta.max()))  # Color height dependent
-	ax3.bar3d(x, y, bottom, 1, 1, pi_theta, color=colors, alpha=0.5)
+	# ax3.bar3d(x, y, bottom, 1, 1, pi_theta, color=colors, alpha=0.5)
 	fig1.canvas.draw_idle()
 	plt.pause(0.01)
 	plt.clf()

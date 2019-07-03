@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class RRT_star:
 	# Basic RRT* algorithm using distance as dist function
 
-	def __init__(self, start, space, obstacles, growth=0.5, max_iter=20, max_dist=20):
+	def __init__(self, start, end, space, obstacles, growth=0.5, max_iter=150, end_sample_percent=5):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location
@@ -23,10 +23,11 @@ class RRT_star:
 		:param end_sample_percent: percent chance to get sample from goal location
 		"""
 		self.start = Node(start[0], start[1], start[2])
+		self.end = Node(end[0], end[1], end[2])
 		self.space = space
 		self.growth = growth
+		self.end_sample_percent = end_sample_percent
 		self.max_iter = max_iter
-		self.max_dist = max_dist
 		self.obstacles = obstacles
 
 	def rrt_star_algorithm(self):
@@ -41,36 +42,41 @@ class RRT_star:
 					continue
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
-			# animate added edges
-			# self.draw_graph()
+			# draw added edges
+			self.draw_graph()
 
 		# generate path
 		last_node = self.get_best_last_node()
 		if last_node is None:
 			return None
-		path, u_optimal, tau_optimal = self.get_path(last_node)
-		return path, u_optimal, tau_optimal
+		path = self.get_path(last_node)
+		return path
 
 	def get_sample(self):
-		sample = Node(random.uniform(self.space[0], self.space[1]),
-					  random.uniform(self.space[0], self.space[1]),
-					  random.uniform(-math.pi, math.pi))
+
+		if random.randint(0, 100) > self.end_sample_percent:
+			sample = Node(random.uniform(self.space[0], self.space[1]),
+						  random.uniform(self.space[0], self.space[1]),
+						  random.uniform(-math.pi, math.pi))
+		else:  # end point sampling
+			sample = Node(self.end.x, self.end.y, self.end.angle)
+
 		return sample
 
 	def steer(self, source_node, destination_node):
 		# take source_node and find path to destination_node
 		curvature = 1.0
-		px, py, pangle, mode, clen, u = plan.dubins_path_planning(source_node.x, source_node.y, source_node.angle, destination_node.x, destination_node.y, destination_node.angle, curvature)
+		px, py, pyaw, mode, clen, u = plan.dubins_path_planning(source_node.x, source_node.y, source_node.angle, destination_node.x, destination_node.y, destination_node.angle, curvature)
 		new_node = copy.deepcopy(source_node)
 		new_node.x = destination_node.x
 		new_node.y = destination_node.y
 		new_node.angle = destination_node.angle
 		new_node.path_x = px
 		new_node.path_y = py
-		new_node.path_angle = pangle
+		new_node.path_yaw = pyaw
 		new_node.u = u
+		new_node.cost = np.sum(u)
 		new_node.dist += clen
-		new_node.cost += -1
 		new_node.parent = source_node
 		return new_node
 
@@ -94,21 +100,16 @@ class RRT_star:
 		return new_node
 
 	def get_best_last_node(self):
-		cost_list = [node.cost for node in self.node_list]
-		best_node = self.node_list[cost_list.index(min(cost_list))]
+		dist_list = [node.dist for node in self.node_list]
+		best_node = self.node_list[dist_list.index(min(dist_list))]
 		return best_node
 
 	def get_path(self, last_node):
 		path = [last_node]
-		u_optimal = []
-		tau_optimal = np.zeros(shape=(3, 1))
 		while last_node.parent is not None:
 			path.append(last_node.parent)
-			u_optimal = u_optimal + last_node.u
-			tau_add = np.vstack((last_node.path_x, last_node.path_y, last_node.path_angle))
-			np.concatenate((tau_optimal, tau_add), axis=1)
 			last_node = last_node.parent
-		return path, u_optimal, tau_optimal
+		return path
 
 	def calc_dist_to_end(self, x, y):
 		return np.linalg.norm([x - self.end.x, y - self.end.y])
@@ -135,14 +136,14 @@ class RRT_star:
 			temp_node = self.steer(new_node, near_node)
 
 			if near_node.dist > temp_node.dist and self.check_collision(temp_node):
-				# print("near node: ", near_node.dist)
-				# print("new node parent: ", new_node.parent.dist)
-				# self.draw_near(near_nodes, new_node, temp_node)
+				print("near node: ", near_node.dist)
+				print("new node parent: ", new_node.parent.dist)
+				self.draw_near(near_nodes, new_node, temp_node)
 
 				near_node.__dict__.update(vars(temp_node))
 
-				# print("REWIRED")
-				# self.draw_near(near_nodes, new_node, temp_node)
+				print("REWIRED")
+				self.draw_near(near_nodes, new_node, temp_node)
 
 	# def check_collision_path(self, node1, node2):
 	# 	# check for collision on path from node1 to node2
@@ -188,7 +189,12 @@ class RRT_star:
 			for (x, y, side) in self.obstacles:
 				plt.plot(x, y, "sk", ms=8 * side)
 
+		# draw field
+		# true_field1 = true_field(1)
+		# true_field1.draw(plt)
+
 		plt.plot(self.start.x, self.start.y, "oy")
+		plt.plot(self.end.x, self.end.y, "or")
 		plt.axis([0, 30, 0, 30])
 		plt.grid(True)
 		plt.title("RRT* (distance dist function)")
@@ -210,11 +216,16 @@ class RRT_star:
 			for (x, y, side) in self.obstacles:
 				plt.plot(x, y, "sk", ms=8 * side)
 
+		# draw field
+		# true_field1 = true_field(1)
+		# true_field1.draw(plt)
+
 		plt.plot(self.start.x, self.start.y, "oy")
+		plt.plot(self.end.x, self.end.y, "or")
 		plt.axis([0, 30, 0, 30])
 		plt.grid(True)
 		plt.title("RRT* (Dubin's Curves)")
-		#plt.waitforbuttonpress()  # need for animation
+		plt.waitforbuttonpress()  # need for animation
 
 
 def dist(node1, node2):
@@ -233,9 +244,8 @@ def main():
 		(9, 15, 4)]
 
 	# calling RRT*
-	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)],  space=[0, 30], obstacles=obstacles)
-	path, u_optimal, tau_optimal = rrt_star.rrt_star_algorithm()
-	print(u_optimal)
+	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)], end=[15.0, 5.0, np.deg2rad(0.0)], obstacles=obstacles, space=[0, 30])
+	path = rrt_star.rrt_star_algorithm()
 
 	# plotting code
 	rrt_star.draw_graph()

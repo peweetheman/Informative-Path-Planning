@@ -132,17 +132,15 @@ def LRL(alpha, beta, d):
 
 
 def dubins_path_planning_from_origin(ex, ey, eyaw, c):
-	# nomalize
+	# normalize
 	dx = ex
 	dy = ey
 	D = math.sqrt(dx ** 2.0 + dy ** 2.0)
 	d = D / c
-	#  print(dx, dy, D, d)
 
 	theta = mod2pi(math.atan2(dy, dx))
 	alpha = mod2pi(- theta)
 	beta = mod2pi(eyaw - theta)
-	#  print(theta, alpha, beta, d)
 
 	planners = [LSL, RSR, LSR, RSL, RLR, LRL]
 
@@ -161,9 +159,9 @@ def dubins_path_planning_from_origin(ex, ey, eyaw, c):
 			bcost = cost
 
 		# print(bmode)
-	px, py, pyaw = generate_course([bt, bp, bq], bmode, c)
+	px, py, pyaw, u = generate_course([bt, bp, bq], bmode, c)
 
-	return px, py, pyaw, bmode, bcost
+	return px, py, pyaw, bmode, bcost, u
 
 
 def dubins_path_planning(sx, sy, syaw, ex, ey, eyaw, c):
@@ -191,7 +189,7 @@ def dubins_path_planning(sx, sy, syaw, ex, ey, eyaw, c):
 	ley = - math.sin(syaw) * ex + math.cos(syaw) * ey
 	leyaw = eyaw - syaw
 
-	lpx, lpy, lpyaw, mode, clen = dubins_path_planning_from_origin(
+	lpx, lpy, lpyaw, mode, clen, u = dubins_path_planning_from_origin(
 		lex, ley, leyaw, c)
 
 	px = [math.cos(-syaw) * x + math.sin(-syaw)
@@ -208,13 +206,14 @@ def dubins_path_planning(sx, sy, syaw, ex, ey, eyaw, c):
 	#  plt.plot(syaw, "*b")
 	#  plt.show()
 
-	return px, py, pyaw, mode, clen
+	return px, py, pyaw, mode, clen, u
 
 
 def generate_course(length, mode, c):
 	px = [0.0]
 	py = [0.0]
 	pyaw = [0.0]
+	u = []
 
 	for m, l in zip(mode, length):
 		pd = 0.0
@@ -230,10 +229,13 @@ def generate_course(length, mode, c):
 
 			if m == "L":  # left turn
 				pyaw.append(pyaw[-1] + d)
+				u.append(1.0)
 			elif m == "S":  # Straight
 				pyaw.append(pyaw[-1])
+				u.append(0.0)
 			elif m == "R":  # right turn
 				pyaw.append(pyaw[-1] - d)
+				u.append(-1.0)
 			pd += d
 
 		d = l - pd
@@ -242,13 +244,16 @@ def generate_course(length, mode, c):
 
 		if m == "L":  # left turn
 			pyaw.append(pyaw[-1] + d)
+			u.append(1.0)
 		elif m == "S":  # Straight
 			pyaw.append(pyaw[-1])
+			u.append(0.0)
 		elif m == "R":  # right turn
 			pyaw.append(pyaw[-1] - d)
+			u.append(-1.0)
 		pd += d
 
-	return px, py, pyaw
+	return px, py, pyaw, u
 
 
 def plot_arrow(x, y, yaw, length=1.0, width=0.5, fc="r", ec="k"):  # pragma: no cover
@@ -278,8 +283,11 @@ if __name__ == '__main__':
 
 	curvature = 1.0
 
-	px, py, pyaw, mode, clen = dubins_path_planning(start_x, start_y, start_yaw,
+	px, py, pyaw, mode, clen, u = dubins_path_planning(start_x, start_y, start_yaw,
 													end_x, end_y, end_yaw, curvature)
+
+	print(u)
+	print(px)
 
 	plt.plot(px, py, label="final course " + "".join(mode))
 
