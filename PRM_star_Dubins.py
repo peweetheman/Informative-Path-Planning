@@ -9,10 +9,10 @@ import time
 import matplotlib.pyplot as plt
 
 
-class RRT_star:
-	# Basic RRT* algorithm using distance as dist function
+class PRM_star_Dubins:
+	# PRM* algorithm using distance as dist function
 
-	def __init__(self, start, end, space, obstacles, growth=0.5, max_iter=150, end_sample_percent=5):
+	def __init__(self, start, space, obstacles, growth=0.5, max_iter=20, max_dist=20):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location
@@ -23,14 +23,13 @@ class RRT_star:
 		:param end_sample_percent: percent chance to get sample from goal location
 		"""
 		self.start = Node(start[0], start[1], start[2])
-		self.end = Node(end[0], end[1], end[2])
 		self.space = space
 		self.growth = growth
-		self.end_sample_percent = end_sample_percent
 		self.max_iter = max_iter
+		self.max_dist = max_dist
 		self.obstacles = obstacles
 
-	def rrt_star_algorithm(self):
+	def control_algorithm(self):
 		self.node_list = [self.start]
 		for i in range(self.max_iter):
 			sample_node = self.get_sample()
@@ -38,50 +37,45 @@ class RRT_star:
 			if self.check_collision(sample_node):
 				near_nodes = self.get_near_nodes(sample_node)
 				new_node = self.set_parent(sample_node, near_nodes)
-				if new_node is None:    # no possible path from any of the near nodes
+				if new_node is None:  # no possible path from any of the near nodes
 					continue
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
-			# draw added edges
-			self.draw_graph()
+			# animate added edges
+			# self.draw_graph()
 
 		# generate path
 		last_node = self.get_best_last_node()
 		if last_node is None:
 			return None
-		path = self.get_path(last_node)
-		return path
+		path, u_optimal, tau_optimal = self.get_path(last_node)
+		return path, u_optimal, tau_optimal
 
 	def get_sample(self):
-
-		if random.randint(0, 100) > self.end_sample_percent:
-			sample = Node(random.uniform(self.space[0], self.space[1]),
-						  random.uniform(self.space[0], self.space[1]),
-						  random.uniform(-math.pi, math.pi))
-		else:  # end point sampling
-			sample = Node(self.end.x, self.end.y, self.end.angle)
-
+		sample = Node(random.uniform(self.space[0], self.space[1]),
+					  random.uniform(self.space[2], self.space[3]),
+					  random.uniform(-math.pi, math.pi))
 		return sample
 
 	def steer(self, source_node, destination_node):
 		# take source_node and find path to destination_node
 		curvature = 1.0
-		px, py, pyaw, mode, clen, u = plan.dubins_path_planning(source_node.x, source_node.y, source_node.angle, destination_node.x, destination_node.y, destination_node.angle, curvature)
+		px, py, pangle, mode, clen, u = plan.dubins_path_planning(source_node.x, source_node.y, source_node.angle, destination_node.x, destination_node.y, destination_node.angle, curvature)
 		new_node = copy.deepcopy(source_node)
 		new_node.x = destination_node.x
 		new_node.y = destination_node.y
 		new_node.angle = destination_node.angle
 		new_node.path_x = px
 		new_node.path_y = py
-		new_node.path_yaw = pyaw
+		new_node.path_angle = pangle
 		new_node.u = u
-		new_node.cost = np.sum(u)
 		new_node.dist += clen
+		new_node.cost += -1.0
 		new_node.parent = source_node
 		return new_node
 
 	def set_parent(self, sample_node, near_nodes):
-		# connects new_node along a minimum dist path
+		# connects new_node along a minimum cost path
 		if not near_nodes:
 			near_nodes.append(self.nearest_node(sample_node))
 		dlist = []
@@ -100,16 +94,23 @@ class RRT_star:
 		return new_node
 
 	def get_best_last_node(self):
-		dist_list = [node.dist for node in self.node_list]
-		best_node = self.node_list[dist_list.index(min(dist_list))]
+		cost_list = [node.cost for node in self.node_list]
+		best_node = self.node_list[cost_list.index(min(cost_list))]
 		return best_node
 
 	def get_path(self, last_node):
 		path = [last_node]
-		while last_node.parent is not None:
+		u_optimal = []
+		tau_optimal = np.vstack((last_node.path_x, last_node.path_y, last_node.path_angle))
+		while True:
 			path.append(last_node.parent)
+			u_optimal = u_optimal + last_node.u
 			last_node = last_node.parent
-		return path
+			if last_node is None:
+				break
+			tau_add = np.vstack((last_node.path_x, last_node.path_y, last_node.path_angle))
+			tau_optimal = np.concatenate((tau_add, tau_optimal), axis=1)
+		return path, u_optimal, tau_optimal
 
 	def calc_dist_to_end(self, x, y):
 		return np.linalg.norm([x - self.end.x, y - self.end.y])
@@ -136,14 +137,14 @@ class RRT_star:
 			temp_node = self.steer(new_node, near_node)
 
 			if near_node.dist > temp_node.dist and self.check_collision(temp_node):
-				print("near node: ", near_node.dist)
-				print("new node parent: ", new_node.parent.dist)
-				self.draw_near(near_nodes, new_node, temp_node)
+				# print("near node: ", near_node.dist)
+				# print("new node parent: ", new_node.parent.dist)
+				# self.draw_near(near_nodes, new_node, temp_node)
 
 				near_node.__dict__.update(vars(temp_node))
 
-				print("REWIRED")
-				self.draw_near(near_nodes, new_node, temp_node)
+			# print("REWIRED")
+			# self.draw_near(near_nodes, new_node, temp_node)
 
 	# def check_collision_path(self, node1, node2):
 	# 	# check for collision on path from node1 to node2
@@ -175,30 +176,43 @@ class RRT_star:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, node1, node2):
+	def cost(self, gmrf, path):
 		return 0
 
-	def draw_graph(self):
-		plt.clf()
-		for node in self.node_list:
-			plt.plot(node.x, node.y, "yH")
-			if node.parent is not None:
-				plt.plot(node.path_x, node.path_y, "-g")
+	def draw_graph(self, plot=None):
+		# plt.clf()
+		if plot is None:  # use built in plt
+			for node in self.node_list:
+				plt.plot(node.x, node.y, "yH")
+				if node.parent is not None:
+					plt.plot(node.path_x, node.path_y, "-g")
 
-		if self.obstacles is not None:
-			for (x, y, side) in self.obstacles:
-				plt.plot(x, y, "sk", ms=8 * side)
+			if self.obstacles is not None:
+				for (x, y, side) in self.obstacles:
+					plt.plot(x, y, "sk", ms=8 * side)
 
-		# draw field
-		# true_field1 = true_field(1)
-		# true_field1.draw(plt)
+			plt.plot(self.start.x, self.start.y, "yo")
+			plt.axis(self.space)
+			plt.grid(True)
+			plt.title("PRM* (distance cost function)")
+			plt.pause(.1)  # need for animation
 
-		plt.plot(self.start.x, self.start.y, "oy")
-		plt.plot(self.end.x, self.end.y, "or")
-		plt.axis([0, 30, 0, 30])
-		plt.grid(True)
-		plt.title("RRT* (distance dist function)")
-		plt.pause(.1)   # need for animation
+		else:  # use plot of calling
+			for node in self.node_list:
+				plot.plot(node.x, node.y, "yH")
+				if node.parent is not None:
+					for (x, y) in zip(node.path_x, node.path_y):
+						plt.plot(x, y, "yH", markersize=2)
+
+			if self.obstacles is not None:
+				for (x, y, side) in self.obstacles:
+					plot.plot(x, y, "sk", ms=8 * side)
+
+			plot.plot(self.start.x, self.start.y, "yo")
+			plot.axis(self.space)
+			plot.grid(True)
+			plot.title("PRM* (distance cost function)")
+			plot.pause(.1)  # need for animation
 
 	def draw_near(self, near_nodes, new_node, temp_node):
 		plt.clf()
@@ -210,21 +224,16 @@ class RRT_star:
 				plt.plot(node.path_x, node.path_y, "-g")
 		plt.plot(temp_node.x, temp_node.y, "go")
 		plt.plot(new_node.x, new_node.y, "mo")
-		plt.text(new_node.x, new_node.y-1, str(new_node.parent.y))
+		plt.text(new_node.x, new_node.y - 1, str(new_node.parent.y))
 		plt.pause(.1)
 		if self.obstacles is not None:
 			for (x, y, side) in self.obstacles:
 				plt.plot(x, y, "sk", ms=8 * side)
 
-		# draw field
-		# true_field1 = true_field(1)
-		# true_field1.draw(plt)
-
 		plt.plot(self.start.x, self.start.y, "oy")
-		plt.plot(self.end.x, self.end.y, "or")
-		plt.axis([0, 30, 0, 30])
+		plt.axis(self.space)
 		plt.grid(True)
-		plt.title("RRT* (Dubin's Curves)")
+		plt.title("PRM* (Dubin's Curves)")
 		plt.waitforbuttonpress()  # need for animation
 
 
@@ -243,12 +252,13 @@ def main():
 		(22, 12, 5),
 		(9, 15, 4)]
 
-	# calling RRT*
-	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)], end=[15.0, 5.0, np.deg2rad(0.0)], obstacles=obstacles, space=[0, 30])
-	path = rrt_star.rrt_star_algorithm()
+	# calling PRM*
+	PRM_star = PRM_star_Dubins(start=[15.0, 28.0, np.deg2rad(0.0)], space=[0, 30, 0, 30], obstacles=obstacles)
+	path, u_optimal, tau_optimal = PRM_star.control_algorithm()
+	print(u_optimal)
 
 	# plotting code
-	rrt_star.draw_graph()
+	PRM_star.draw_graph()
 	plt.plot([node.x for node in path], [node.y for node in path], '-r')
 	plt.grid(True)
 	print("--- %s seconds ---" % (time.time() - start_time))

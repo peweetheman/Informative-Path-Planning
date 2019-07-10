@@ -61,7 +61,6 @@ def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_lim
 														np.dot(R_cost, np.array(u_optimal[kk] + epsilon_auv[kk, jj])))
 
 			for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
-
 				S_tau[kk, jj] = np.sum(pre_x_tau[kk:, jj]) + np.sum(control_cost[kk:, jj])
 			for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
 				exp_lambda_S[kk, jj] = exp(-10 * (S_tau[kk, jj] - np.amin(S_tau[:, jj])) /

@@ -70,13 +70,16 @@ def initialize_animation1(true_field, x_auv, vmin, vmax, var_min, var_max, level
 	return fig1, hyper_x, hyper_y, bottom, colors, trajectory_1
 
 
-def update_animation1(pi_theta, fig1, x, y, bottom, colors, true_field, x_auv, mue_x, var_x, params, trajectory_1, tau_x, tau_optimal, vmin, vmax, var_min, var_max, levels, PlotField, LabelVertices):
+def update_animation1(rrt_star, pi_theta, fig1, x, y, bottom, colors, true_field, x_auv, mue_x, var_x, params, trajectory_1, tau_x, tau_optimal, vmin, vmax, var_min, var_max, levels, PlotField, LabelVertices):
 	(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = params
 	(x_min, x_max, y_min, y_max) = Config.field_dim
 	# xf_grid = np.atleast_2d(np.linspace(x_min, x_max, lxf, endpoint=True)).T  # GMRF grid inside TRUE field
 	# yf_grid = np.atleast_2d(np.linspace(y_min, y_max, lyf, endpoint=True)).T
 	x_grid = np.atleast_2d(np.linspace(xg_min, xg_max, lx, endpoint=True)).T  # COMPLETE GMRF grid
 	y_grid = np.atleast_2d(np.linspace(yg_min, yg_max, ly, endpoint=True)).T
+
+
+
 
 	# Transform mean and variance into matrix for scatter
 	xv, yv = np.meshgrid(x_grid, y_grid)
@@ -87,11 +90,17 @@ def update_animation1(pi_theta, fig1, x, y, bottom, colors, true_field, x_auv, m
 	yv_list = yv.reshape((lx * ly, 1))
 	labels = ['{0}'.format(i) for i in range(lx * ly)]  # Labels for annotating GMRF nodes
 
+
+
+
 	"""Plot True Field"""
 	ax0 = fig1.add_subplot(221)
 	ax0.set_title("True Field")
 	cp = plt.contourf(true_field.x_field, true_field.y_field, true_field.z_field, vmin=vmin, vmax=vmax, levels=levels)
 	plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
+
+
+
 
 	if PlotField == True:
 		"""Plot GMRF mean"""
@@ -127,7 +136,7 @@ def update_animation1(pi_theta, fig1, x, y, bottom, colors, true_field, x_auv, m
 		for jj in range(0, Config.n_k):  # Iterate over all trajectories
 			plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
 		plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
-		plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
+		plt.plot(tau_optimal[0, 1:], tau_optimal[1, 1:], color='blue')
 
 	else:
 		"""Plot GMRF mean"""
@@ -148,19 +157,19 @@ def update_animation1(pi_theta, fig1, x, y, bottom, colors, true_field, x_auv, m
 		# plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
 		plt.plot(trajectory_1[:, 0], trajectory_1[:, 1], color='yellow')
 
-		for jj in range(0, Config.n_k):  # Iterate over all trajectories
-			pass
-			# plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
+		if tau_x is not None:
+			for jj in range(0, Config.n_k):  # Iterate over all trajectories
+				plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
+		if rrt_star is not None:
+			rrt_star.draw_graph(plt)
 		plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
 		plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
-
 	"""Plot Hyperparameter estimate"""
 	ax3 = fig1.add_subplot(224, projection='3d')
 	ax3.set_title("Hyperparameter estimate")
 	# colors = plt.cm.jet(pi_theta.flatten() / float(pi_theta.max()))  # Color height dependent
 	# ax3.bar3d(x, y, bottom, 1, 1, pi_theta, color=colors, alpha=0.5)
 	fig1.canvas.draw_idle()
-	plt.pause(0.01)
+	plt.pause(0.05)
 	plt.clf()
-	# plt.waitforbuttonpress()
 	return trajectory_1

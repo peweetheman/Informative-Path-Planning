@@ -32,7 +32,6 @@ def LSL(alpha, beta, d):
 	t = mod2pi(-alpha + tmp1)
 	p = math.sqrt(p_squared)
 	q = mod2pi(beta - tmp1)
-	#  print(np.rad2deg(t), p, np.rad2deg(q))
 
 	return t, p, q, mode
 
@@ -158,7 +157,6 @@ def dubins_path_planning_from_origin(ex, ey, eyaw, c):
 			bt, bp, bq, bmode = t, p, q, mode
 			bcost = cost
 
-		# print(bmode)
 	px, py, pyaw, u = generate_course([bt, bp, bq], bmode, c)
 
 	return px, py, pyaw, bmode, bcost, u
@@ -218,9 +216,10 @@ def generate_course(length, mode, c):
 	for m, l in zip(mode, length):
 		pd = 0.0
 		if m == "S":
-			d = 1.0 / c
-		else:  # turning couse
-			d = np.deg2rad(3.0)
+			d = .2 / c
+		else:  # turning case
+			d = .2 / c
+
 
 		while pd < abs(l - d):
 			#  print(pd, l)
@@ -229,13 +228,13 @@ def generate_course(length, mode, c):
 
 			if m == "L":  # left turn
 				pyaw.append(pyaw[-1] + d)
-				u.append(1.0)
+				u.append(math.pi)
 			elif m == "S":  # Straight
 				pyaw.append(pyaw[-1])
 				u.append(0.0)
 			elif m == "R":  # right turn
 				pyaw.append(pyaw[-1] - d)
-				u.append(-1.0)
+				u.append(-math.pi)
 			pd += d
 
 		d = l - pd
@@ -244,13 +243,13 @@ def generate_course(length, mode, c):
 
 		if m == "L":  # left turn
 			pyaw.append(pyaw[-1] + d)
-			u.append(1.0)
+			u.append(math.pi)
 		elif m == "S":  # Straight
 			pyaw.append(pyaw[-1])
 			u.append(0.0)
 		elif m == "R":  # right turn
 			pyaw.append(pyaw[-1] - d)
-			u.append(-1.0)
+			u.append(-math.pi)
 		pd += d
 
 	return px, py, pyaw, u

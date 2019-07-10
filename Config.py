@@ -15,7 +15,7 @@ from scipy import exp, sin, cos, sqrt, pi, interpolate
 """Configure the simulation parameters"""
 # AUV starting state
 x_auv = np.array([0.1, 0.1, 0.785]).T  # Initial AUV state
-v_auv = 0.5  # AUV velocity in meter/second (constant)
+v_auv = 1.0  # AUV velocity in meter/second (constant)
 
 # Field dimensions
 field_dim = [0, 10, 0, 5]  # x_min , x_max, y_min, y_max
@@ -73,7 +73,7 @@ elif set_GMRF_cartype == True:
 		alpha_prior = np.array([3, 1, 0.5, 0.3, 0.1, 0.01]).astype(float)
 
 """Choose control parameters"""
-set_sanity_check = False  # Calculates cost for the optimal path and plots the optimal path
+set_sanity_check = True  # Calculates cost for the optimal path and plots the optimal path
 n_updates = 10  # Control loop updates
 n_k = 10  # Number of virtual roll-out pathes
 n_horizon = 10  # Control horizon length in s
@@ -91,7 +91,6 @@ pi_parameters = (n_updates, n_k, n_horizon, N_horizon, t_cstep, sigma_epsilon, R
 # AUV model
 def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_limits, set_border=True):
 	x_auv_out = np.zeros(shape=3)
-	print("control: ", u_auv)
 	x_auv_out[2] = x_auv[2] + u_auv * delta_t + epsilon_a * sqrt(delta_t)  # computes angle
 	x_auv_out[0] = x_auv[0] + v_auv * cos(x_auv_out[2]) * delta_t
 	x_auv_out[1] = x_auv[1] + v_auv * sin(x_auv_out[2]) * delta_t

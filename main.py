@@ -12,6 +12,7 @@ import Config
 import gp_scripts
 import control_scripts
 from RRT_star import RRT_star
+from PRM_star_Dubins import PRM_star_Dubins
 import plot_scripts
 from true_field import true_field
 import time
@@ -44,11 +45,10 @@ u_optimal = np.zeros(shape=(Config.N_horizon, 1))
 
 """#####################################################################################"""
 """START SIMULATION"""
-for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms sekunden
+for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 	if time_in_ms % Config.sample_time_gmrf < 0.0000001:
 		# Calculate next AUV state
-		print("u opt 0: ", u_optimal)
-		x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, field_limits)
+		# x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, field_limits)
 		trajectory_1 = np.vstack([trajectory_1, x_auv])
 
 		# Compute discrete observation vector and new observation
@@ -63,15 +63,18 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms sekunden
 
 		# Calculate optimal control path
 		# u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
+		# rrt_star = None
 
-		rrt_star = RRT_star(start=x_auv, space=[0, 30], obstacles=None)
-		path, u_optimal, tau_optimal = rrt_star.rrt_star_algorithm()
-		tau_x = []
+		PRM_star = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None)
+		path_optimal, u_optimal, tau_optimal = PRM_star.control_algorithm()
+		x_auv = tau_optimal[:, 3]
+		print("x_auv", x_auv)
+		tau_x = None
 
 		time_5 = time.time()
-		print("Calc. time PI: /", "{0:.2f}".format(time_5 - time_4))
+		print("Calc. time control script: /", "{0:.2f}".format(time_5 - time_4))
 
 		# Plot new GMRF belief and optimal control path
-		plot_scripts.update_animation1(pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
+		plot_scripts.update_animation1(PRM_star, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
 		time_6 = time.time()
 		print("Calc. time Plot: /", "{0:.2f}".format(time_6 - time_5))
