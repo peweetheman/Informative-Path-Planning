@@ -162,8 +162,12 @@ def update_animation1(rrt_star, pi_theta, fig1, x, y, bottom, colors, true_field
 				plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
 		if rrt_star is not None:
 			rrt_star.draw_graph(plt)
+
 		plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
+
+		plt.quiver(x_auv[0], x_auv[1], np.cos(x_auv[2]), np.sin(x_auv[2]), width=.005)
 		plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
+
 	"""Plot Hyperparameter estimate"""
 	ax3 = fig1.add_subplot(224, projection='3d')
 	ax3.set_title("Hyperparameter estimate")

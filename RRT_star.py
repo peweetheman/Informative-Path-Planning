@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class RRT_star:
 	# Basic RRT* algorithm using distance as dist function
 
-	def __init__(self, start, space, obstacles, growth=0.5, max_iter=20, max_dist=20):
+	def __init__(self, start, space, obstacles, growth=1, max_iter=100, max_dist=20):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location
@@ -28,10 +28,9 @@ class RRT_star:
 		self.max_iter = max_iter
 		self.max_dist = max_dist
 		self.obstacles = obstacles
-
-	def control_algorithm(self):
 		self.node_list = [self.start]
 
+	def control_algorithm(self):
 		# RRT* ALGORITHM
 		for i in range(self.max_iter):
 			sample_node = self.get_sample()
@@ -46,7 +45,7 @@ class RRT_star:
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
 			# animate added edges
-			# self.draw_graph()
+			self.draw_graph()
 
 		# generate path
 		last_node = self.get_best_last_node()
@@ -63,16 +62,17 @@ class RRT_star:
 
 	def steer(self, source_node, destination_node):
 		# take source_node and steer towards destination node
-		angle = math.atan2(destination_node.y - source_node.y, destination_node.x - source_node.x)
+		vec = np.array((destination_node.x - source_node.x, destination_node.y - source_node.y, destination_node.angle - source_node.angle))
+		unit_vec = vec / np.linalg.norm(vec)
 		new_node = Node(source_node.x, source_node.y, source_node.angle)
 		currentDistance = dist(source_node, destination_node)
 		# find a point within growth of nearest_node, and closest to sample
 		if currentDistance <= self.growth:
 			pass
 		else:
-			new_node.x = source_node.x + self.growth * math.cos(angle)
-			new_node.y = source_node.y + self.growth * math.sin(angle)
-			new_node.angle = source_node.angle + self.growth *
+			new_node.x = destination_node.x + self.growth * unit_vec[0]
+			new_node.y = destination_node.y + self.growth * unit_vec[1]
+			new_node.angle = destination_node.angle + self.growth * unit_vec[2]
 		new_node.cost = float("inf")
 		new_node.parent = None
 		return new_node
@@ -124,15 +124,8 @@ class RRT_star:
 		d = 2  # dimension of the self.space
 		nnode = len(self.node_list)
 		r = min(50.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 20.0)
-		dlist = [(node.x - new_node.x) ** 2 +
-				 (node.y - new_node.y) ** 2 +
-				 (node.angle - new_node.angle) ** 2
-				 for node in self.node_list]
-
+		dlist = [dist(node, new_node) for node in self.node_list]
 		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r ** 2]
-
-		for node in near_nodes:
-			node.is_near = True
 		return near_nodes
 
 	def rewire(self, new_node, near_nodes):
@@ -257,7 +250,7 @@ def main():
 
 	# calling RRT*
 	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)],  space=[0, 30, 0, 30], obstacles=obstacles)
-	path, u_optimal, tau_optimal = rrt_star.rrt_star_algorithm()
+	path, u_optimal, tau_optimal = rrt_star.control_algorithm()
 	print(u_optimal)
 
 	# plotting code

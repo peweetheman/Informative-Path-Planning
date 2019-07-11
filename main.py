@@ -12,7 +12,7 @@ import Config
 import gp_scripts
 import control_scripts
 from RRT_star import RRT_star
-from PRM_star_Dubins import PRM_star_Dubins
+from PRM_star_Dubins_control import PRM_star_Dubins
 import plot_scripts
 from true_field import true_field
 import time
@@ -68,7 +68,6 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 		PRM_star = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None)
 		path_optimal, u_optimal, tau_optimal = PRM_star.control_algorithm()
 		x_auv = tau_optimal[:, 3]
-		print("x_auv", x_auv)
 		tau_x = None
 
 		time_5 = time.time()
