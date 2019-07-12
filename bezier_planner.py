@@ -131,7 +131,7 @@ def main():
 	# control_points = np.array([[5., 1.], [-2.78, 1.], [-11.5, -4.5], [-6., -8.]])
 	# path = calc_bezier_path(control_points, n_points=100)
 
-	# Display the tangent, normal and radius of cruvature at a given point
+	# Display the tangent, normal and radius of curvature at a given point
 	t = 0.86  # Number in [0, 1]
 	x_target, y_target = bezier(t, control_points)
 	derivatives_cp = bezier_derivatives_control_points(control_points, 2)
@@ -183,6 +183,7 @@ def main2():
 	for offset in np.arange(1.0, 5.0, 1.0):
 		path, control_points = calc_4points_bezier_path(
 			start_x, start_y, start_yaw, end_x, end_y, end_yaw, offset)
+		print(path.shape)
 		assert path.T[0][0] == start_x, "path is invalid"
 		assert path.T[1][0] == start_y, "path is invalid"
 		assert path.T[0][-1] == end_x, "path is invalid"
@@ -201,5 +202,5 @@ def main2():
 
 
 if __name__ == '__main__':
-	main()
-	#  main2()
+	# main()
+	main2()

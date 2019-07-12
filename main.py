@@ -65,7 +65,7 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 		# u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
 		# rrt_star = None
 
-		PRM_star = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None)
+		PRM_star = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params)
 		path_optimal, u_optimal, tau_optimal = PRM_star.control_algorithm()
 		x_auv = tau_optimal[:, 3]
 		tau_x = None

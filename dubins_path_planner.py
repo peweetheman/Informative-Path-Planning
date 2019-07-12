@@ -187,7 +187,7 @@ def dubins_path_planning(sx, sy, syaw, ex, ey, eyaw, c):
 	ley = - math.sin(syaw) * ex + math.cos(syaw) * ey
 	leyaw = eyaw - syaw
 
-	lpx, lpy, lpyaw, mode, clen, u = dubins_path_planning_from_origin(
+	lpx, lpy, lpyaw, mode, cost, u = dubins_path_planning_from_origin(
 		lex, ley, leyaw, c)
 
 	px = [math.cos(-syaw) * x + math.sin(-syaw)
@@ -204,7 +204,7 @@ def dubins_path_planning(sx, sy, syaw, ex, ey, eyaw, c):
 	#  plt.plot(syaw, "*b")
 	#  plt.show()
 
-	return px, py, pyaw, mode, clen, u
+	return px, py, pyaw, mode, cost, u
 
 
 def generate_course(length, mode, c):

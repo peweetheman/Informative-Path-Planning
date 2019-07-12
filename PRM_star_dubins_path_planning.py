@@ -189,7 +189,8 @@ def main():
 
 	# plotting code
 	rrt_star.draw_graph()
-	plt.plot([node.pose[0] for node in path], [node.pose[1] for node in path], '-r')
+	if path is not None:
+		plt.plot([node.pose[0] for node in path], [node.pose[1] for node in path], '-r')
 	plt.grid(True)
 	print("--- %s seconds ---" % (time.time() - start_time))
 	plt.show()

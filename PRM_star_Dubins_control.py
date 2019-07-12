@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class PRM_star_Dubins:
 	# PRM* algorithm using distance as dist function
 
-	def __init__(self, start, space, obstacles, growth=0.5, max_iter=20, max_dist=20):
+	def __init__(self, start, space, obstacles, var_x, gmrf_params, growth=0.5, max_iter=20, max_dist=20):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location
@@ -29,6 +29,8 @@ class PRM_star_Dubins:
 		self.max_dist = max_dist
 		self.obstacles = obstacles
 		self.node_list = [self.start]
+		self.var_x = var_x
+		self.gmrf_params = gmrf_params
 
 	def control_algorithm(self):
 		for i in range(self.max_iter):
@@ -60,14 +62,14 @@ class PRM_star_Dubins:
 	def steer(self, source_node, destination_node):
 		# take source_node and find path to destination_node
 		curvature = 1.0
-		px, py, pangle, mode, clen, u = plan.dubins_path_planning(source_node.pose[0], source_node.pose[1], source_node.pose[2], destination_node.pose[0], destination_node.pose[1], destination_node.pose[2], curvature)
+		px, py, pangle, mode, plength, u = plan.dubins_path_planning(source_node.pose[0], source_node.pose[1], source_node.pose[2], destination_node.pose[0], destination_node.pose[1], destination_node.pose[2], curvature)
 		new_node = copy.deepcopy(source_node)
 		new_node.pose = destination_node.pose
 		new_node.path_x = px
 		new_node.path_y = py
 		new_node.path_angle = pangle
 		new_node.u = u
-		new_node.dist += clen
+		new_node.dist += plength
 		new_node.cost += -1.0
 		new_node.parent = source_node
 		return new_node
@@ -118,7 +120,7 @@ class PRM_star_Dubins:
 		# for asymptotical completeness see Kalman 2011. gamma = 1 satisfies
 		d = 2  # dimension of the self.space
 		nnode = len(self.node_list)
-		r = min(50.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 20.0)
+		r = min(30.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 10.0)
 		dlist = [dist(new_node, node) for node in self.node_list]
 		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r ** 2]
 		return near_nodes
@@ -206,7 +208,8 @@ def main():
 
 	# plotting code
 	PRM_star.draw_graph()
-	plt.plot([node.pose[0] for node in path], [node.pose[1] for node in path], '-r')
+	if path[-1] is not None:
+		plt.plot([node.pose[0] for node in path], [node.pose[1] for node in path], '-r')
 	plt.grid(True)
 	print("--- %s seconds ---" % (time.time() - start_time))
 	plt.show()
