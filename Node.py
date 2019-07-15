@@ -6,10 +6,10 @@ class Node(object):
 		self.cost = 0.0
 		self.dist = 0.0
 		self.pose = np.array(pose)           # x-coordinate, y-coordinate, angle-coordinate constitutes a pose
-		self.path = []             # list of poses on the way from parent node to this node
 		self.u = []                # list of controls required to get from parent node to this node
 
-		# used for PRM implementation currently
+		#self.path = []             # list of poses on the way from parent node to this node
+		# used for implementations currently
 		self.path_x = []
 		self.path_y = []
 		self.path_angle = []

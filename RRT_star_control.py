@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 class RRT_star:
 	# Basic RRT* algorithm using distance as cost function
 
-	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, growth=1, max_iter=100, max_dist=20, max_curvature=1.0):
+	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, growth=1, max_iter=50, max_dist=20, min_dist=3, max_curvature=1.0):
 		"""
 		:param start: [x,y] starting location
 		:param space: [min,max] bounds on square space
@@ -27,11 +27,13 @@ class RRT_star:
 		self.growth = growth
 		self.max_iter = max_iter
 		self.max_dist = max_dist
+		self.min_dist = min_dist
 		self.obstacles = obstacles
 		self.var_x = var_x
 		self.gmrf_params = gmrf_params
 		self.max_curvature = max_curvature
 		self.local_planner_time = 0.0
+		self.rewire_time = 0.0
 
 	def control_algorithm(self):
 		for i in range(self.max_iter):
@@ -45,14 +47,14 @@ class RRT_star:
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
 			# draw added edges
-			self.draw_graph()
-
+			# self.draw_graph()
 		# generate path
 		last_node = self.get_best_last_node()
 		if last_node is None:
+			print("no best last node!")
 			return None
 		path, u_optimal, tau_optimal = self.get_path(last_node)
-		return path, u_optimal, tau_optimal
+		return path, u_optimal, tau_optimal, self.local_planner_time, self.rewire_time
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
@@ -78,7 +80,7 @@ class RRT_star:
 		unit_vec = vec / np.linalg.norm(vec)
 		new_node = Node(dest_node.pose)
 		currentDistance = dist(source_node, dest_node)
-		
+
 		# find a point within growth of nearest_node, and closest to sample
 		if currentDistance <= self.growth:
 			pass
@@ -91,22 +93,22 @@ class RRT_star:
 	def set_parent(self, new_node, near_nodes):
 		# connects new_node along a minimum cost path
 		if not near_nodes:
-			return
-		costlist = []
+			near_nodes.append(self.nearest_node(new_node))
+		cost_list = []
 		for near_node in near_nodes:
 			# CALL TO LOCAL PATH PLANNER
 			p1 = time.time()
 			px, py, pangle, mode, plength, u = plan.dubins_path_planning(near_node.pose[0], near_node.pose[1], near_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
 			p2 = time.time()
 			self.local_planner_time += (p2 - p1)
-			cost = self.cost(px, py)
-			if self.check_collision_path(px, py):
-				costlist.append(near_node.cost + cost)
+			cost = self.cost(px, py, pangle, plength)
+			if self.check_collision_path(px, py) and self.max_dist >= plength + near_node.dist:
+				cost_list.append(near_node.cost + cost)
 			else:
-				costlist.append(float("inf"))
+				cost_list.append(float("inf"))
 
-		mincost = min(costlist)
-		min_node = near_nodes[costlist.index(mincost)]
+		mincost = min(cost_list)
+		min_node = near_nodes[cost_list.index(mincost)]
 		if mincost == float("inf"):
 			print("mincost is inf")
 			return
@@ -118,57 +120,75 @@ class RRT_star:
 		px, py, pangle, mode, plength, u = plan.dubins_path_planning(min_node.pose[0], min_node.pose[1], min_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
 		p2 = time.time()
 		self.local_planner_time += (p2-p1)
-		new_node.path = np.vstack((px, py, pangle))
+		new_node.path_x = px
+		new_node.path_y = py
+		new_node.path_angle = pangle
 		new_node.u = u
+		new_node.dist = new_node.parent.dist + plength
 
 	def get_best_last_node(self):
-		cost_list = [node.cost for node in self.node_list]
+		cost_list = []
+		for node in self.node_list:
+			if node.dist >=self.min_dist:
+				cost_list.append(node.cost)
+			else:
+				cost_list.append(float("inf"))
 		best_node = self.node_list[cost_list.index(min(cost_list))]
 		return best_node
 
 	def get_path(self, last_node):
 		path = [last_node]
-		u_optimal = []
-		tau_optimal = last_node.path     # matrix of shape of 3, # of timesteps. Represents x, y, angle as a column for each timestep
+		u_optimal = np.array((last_node.u))
+		tau_optimal = np.vstack((last_node.path_x, last_node.path_y, last_node.path_angle))
 		while True:
-			path.append(last_node.parent)
-			u_optimal = u_optimal + last_node.u            # NOT WORKING and NOT USED!!!!
 			last_node = last_node.parent
 			if last_node is None:
 				break
-			tau_add = last_node.path
+			u_optimal = np.concatenate((u_optimal, last_node.u), axis=0)
+			tau_add = np.vstack((last_node.path_x, last_node.path_y, last_node.path_angle))
 			tau_optimal = np.concatenate((tau_add, tau_optimal), axis=1)
+			path.append(last_node)
 		return path, u_optimal, tau_optimal
 
 	def get_near_nodes(self, new_node):
 		# gamma_star = 2(1+1/d) ** (1/d) volume(free)/volume(total) ** 1/d. We need a gamma > gamma_star for asymptotical completeness. See Kalman 2011. gamma = 1 satisfies
 		d = 2  # dimension of the self.space
 		nnode = len(self.node_list)
-		r = min(50.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 20.0)
-
+		r = min(30.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 10.0)
 		dlist = [dist(node, new_node) for node in self.node_list]
 		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r ** 2]
 		return near_nodes
 
 	def rewire(self, new_node, near_nodes):
+		p1 = time.time()
 		for near_node in near_nodes:
-			px, py, pangle, mode, plength, u = plan.dubins_path_planning(new_node.pose[0], new_node.pose[1], new_node.pose[2], near_node.pose[0], near_node.pose[1], near_node.pose[2], self.max_curvature)
-			temp_cost = new_node.cost + self.cost(px, py)
-			if near_node.cost > temp_cost:
+			p1 = time.time()
+			px, py, pangle, mode, plength, u = plan.dubins_path_planning(near_node.pose[0], near_node.pose[1], near_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+			p2 = time.time()
+			self.local_planner_time += (p2 - p1)
+			temp_cost = new_node.cost + self.cost(px, py, pangle, plength)
+			if near_node.cost > temp_cost and self.max_dist >= new_node.dist + plength:
 				if self.check_collision_path(px, py):
 					near_node.parent = new_node
 					near_node.cost = temp_cost
-					near_node.path = np.vstack((px, py, pangle))
+					near_node.path_x = px
+					near_node.path_y = py
+					near_node.path_angle = pangle
 					near_node.u = u
+					near_node.dist = near_node.parent.dist + plength
+		self.rewire_time += (time.time() - p1)
+
 
 	def check_collision_path(self, px, py):
 		# check for collision on path
-		for (x, y) in (px, py):
-			if not self.check_collision(x, y):
+		for kk in range(len(px)):
+			if not self.check_collision(px[kk], py[kk]):
 				return False
 		return True
 
 	def check_collision(self, x_node, y_node):
+		if self.obstacles is None:
+			return True   # safe
 		for (x, y, side) in self.obstacles:
 			if (x_node > x - .8 * side / 2) and (x_node < x + .8 * side / 2) and (y_node > y - side / 2) and (y_node < y + side / 2):
 				return False  # collision
@@ -180,47 +200,56 @@ class RRT_star:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, px, py):
+	def cost(self, px, py, pangle, plength):
 		control_cost = 0        # NOT USED!!!!!!
-		var_cost = 0
-		if self.gmrf_params is not None:
-			(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
+		var_cost = np.zeros(len(px))
 
-			#iterate over path and calculate cost
-			for (x, y) in (px, py):
-				if not (self.space[0] <= x <= self.space[1]) or not (self.space[2] <= y <= self.space[3]):
-					var_cost += Config.border_variance_penalty
-					control_cost += 0
-				else:
-					A_z = Config.interpolation_matrix(np.array([x, y, 0]), n, p, lx, xg_min, yg_min, de)  #used 0 for angle I don't think it matters
-					var_cost = 1 / np.dot(A_z.T, self.var_x)
-					control_cost += 0
-			return var_cost
-		else:
-			return dist(source_node, dest_node)
+		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
 
-	def draw_graph(self):
-		plt.clf()
-		for node in self.node_list:
-			plt.plot(node.pose[0], node.pose[1], "yH")
-			#plt.text(node.pose[0], node.pose[1], str(node.cost), color="red", fontsize=12)
+		#iterate over path and calculate cost
+		for kk in range(len(px)):      # Iterate over length of trajectory
+			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
+				var_cost[kk] = Config.border_variance_penalty
+				control_cost += 0
+			else:
+				A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
+				var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
+				control_cost += 0
+		return np.sum(var_cost) * plength
 
-			if node.parent is not None:
-				plt.plot([node.pose[0], node.parent.pose[0]], [
-					node.pose[1], node.parent.pose[1]], "-k")
+	def draw_graph(self, plot=None):
+		if plot is None:  # use built in plt
+			for node in self.node_list:
+				plt.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]), color="r")
+				if node.parent is not None:
+					plt.plot(node.path_x, node.path_y, "-g")
 
-		for (x, y, side) in self.obstacles:
-			plt.plot(x, y, "sk", ms=8 * side)
+			if self.obstacles is not None:
+				for (x, y, side) in self.obstacles:
+					plt.plot(x, y, "sk", ms=8 * side)
 
-		# draw field
-		#true_field1 = true_field(1)
-		#true_field1.draw(plt)
+			plt.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
+			plt.axis(self.space)
+			plt.grid(True)
+			plt.title("RRT* (distance cost function)")
+			plt.pause(.1)  # need for animation
 
-		plt.plot(self.start.pose[0], self.start.pose[1], "oy")
-		plt.axis([0, 30, 0, 30])
-		plt.grid(True)
-		plt.title("RRT* (distance cost function)")
-		plt.pause(0.001)   # need for animation
+		else:  # use plot of calling
+			for node in self.node_list:
+				plot.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]))
+				if node.parent is not None:
+					for (x, y) in zip(node.path_x, node.path_y):
+						plt.plot(x, y, "yH", markersize=2)
+
+			if self.obstacles is not None:
+				for (x, y, side) in self.obstacles:
+					plot.plot(x, y, "sk", ms=8 * side)
+
+			plot.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
+			plot.axis(self.space)
+			plot.grid(True)
+			plot.title("RRT* (distance cost function)")
+			plot.pause(.1)  # need for animation
 
 def dist(node1, node2):
 	# returns distance between two nodes

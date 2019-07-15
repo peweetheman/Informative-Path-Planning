@@ -1,5 +1,6 @@
 from Node import Node
 import dubins_path_planner as plan
+import Config
 from true_field import true_field
 import random
 import math
@@ -12,25 +13,26 @@ import matplotlib.pyplot as plt
 class PRM_star_Dubins:
 	# PRM* algorithm using distance as dist function
 
-	def __init__(self, start, space, obstacles, var_x, gmrf_params, growth=0.5, max_iter=20, max_dist=20):
+	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, max_iter=30, max_dist=25, min_dist=3, max_curvature=1.0):
 		"""
 		:param start: [x,y] starting location
-		:param end: [x,y[ ending location
 		:param space: [min,max] bounds on square space
 		:param obstacles: list of square obstacles
 		:param growth: size of growth each new sample
 		:param max_iter: max number of iterations for algorithm
-		:param end_sample_percent: percent chance to get sample from goal location
 		"""
 		self.start = Node(start)
+		self.node_list = [self.start]
 		self.space = space
-		self.growth = growth
 		self.max_iter = max_iter
 		self.max_dist = max_dist
+		self.min_dist = min_dist
 		self.obstacles = obstacles
-		self.node_list = [self.start]
 		self.var_x = var_x
 		self.gmrf_params = gmrf_params
+		self.max_curvature = max_curvature
+		self.local_planner_time = 0.0
+
 
 	def control_algorithm(self):
 		for i in range(self.max_iter):
@@ -51,7 +53,7 @@ class PRM_star_Dubins:
 		if last_node is None:
 			return None
 		path, u_optimal, tau_optimal = self.get_path(last_node)
-		return path, u_optimal, tau_optimal
+		return path, u_optimal, tau_optimal, self.local_planner_time
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
@@ -61,8 +63,9 @@ class PRM_star_Dubins:
 
 	def steer(self, source_node, destination_node):
 		# take source_node and find path to destination_node
-		curvature = 1.0
-		px, py, pangle, mode, plength, u = plan.dubins_path_planning(source_node.pose[0], source_node.pose[1], source_node.pose[2], destination_node.pose[0], destination_node.pose[1], destination_node.pose[2], curvature)
+		time1 = time.time()
+		px, py, pangle, mode, plength, u = plan.dubins_path_planning(source_node.pose[0], source_node.pose[1], source_node.pose[2], destination_node.pose[0], destination_node.pose[1], destination_node.pose[2], self.max_curvature)
+		self.local_planner_time += time.time() - time1
 		new_node = copy.deepcopy(source_node)
 		new_node.pose = destination_node.pose
 		new_node.path_x = px
@@ -70,7 +73,7 @@ class PRM_star_Dubins:
 		new_node.path_angle = pangle
 		new_node.u = u
 		new_node.dist += plength
-		new_node.cost += -1.0
+		new_node.cost += self.cost(px, py, pangle, plength)
 		new_node.parent = source_node
 		return new_node
 
@@ -78,23 +81,29 @@ class PRM_star_Dubins:
 		# connects new_node along a minimum cost path
 		if not near_nodes:
 			near_nodes.append(self.nearest_node(sample_node))
-		dlist = []
+		cost_list = []
 		for near_node in near_nodes:
 			temp_node = self.steer(near_node, sample_node)
-			if self.check_collision(temp_node):
-				dlist.append(temp_node.dist)
+			if self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
+				cost_list.append(temp_node.dist)
 			else:
-				dlist.append(float("inf"))
+				cost_list.append(float("inf"))
 
-		mindist = min(dlist)
-		min_node = near_nodes[dlist.index(mindist)]
-		if mindist == float("inf"):
+		min_cost = min(cost_list)
+		min_node = near_nodes[cost_list.index(min_cost)]
+		if cost_list == float("inf"):
+			print("min cost is inf")
 			return None
 		new_node = self.steer(min_node, sample_node)
 		return new_node
 
 	def get_best_last_node(self):
-		cost_list = [node.cost for node in self.node_list]
+		cost_list = []
+		for node in self.node_list:
+			if node.dist >=self.min_dist:
+				cost_list.append(node.cost)
+			else:
+				cost_list.append(float("inf"))
 		best_node = self.node_list[cost_list.index(min(cost_list))]
 		return best_node
 
@@ -112,15 +121,12 @@ class PRM_star_Dubins:
 			tau_optimal = np.concatenate((tau_add, tau_optimal), axis=1)
 		return path, u_optimal, tau_optimal
 
-	def calc_dist_to_end(self, x, y):
-		return np.linalg.norm([x - self.end.pose[0], y - self.end.pose[1]])
-
 	def get_near_nodes(self, new_node):
 		# gamma_star = 2(1+1/d) ** (1/d) volume(free)/volume(total) ** 1/d and we need gamma > gamma_star
 		# for asymptotical completeness see Kalman 2011. gamma = 1 satisfies
 		d = 2  # dimension of the self.space
 		nnode = len(self.node_list)
-		r = min(30.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 10.0)
+		r = min(30.0 * ((math.log(nnode) / nnode)) ** (1 / d), 10.0)
 		dlist = [dist(new_node, node) for node in self.node_list]
 		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r ** 2]
 		return near_nodes
@@ -128,8 +134,7 @@ class PRM_star_Dubins:
 	def rewire(self, new_node, near_nodes):
 		for near_node in near_nodes:
 			temp_node = self.steer(new_node, near_node)
-
-			if near_node.dist > temp_node.dist and self.check_collision(temp_node):
+			if near_node.cost > temp_node.cost and self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
 				near_node.__dict__.update(vars(temp_node))
 
 	def check_collision(self, node):
@@ -147,11 +152,24 @@ class PRM_star_Dubins:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, gmrf, path):
-		return 0
+	def cost(self, px, py, pangle, plength):
+		control_cost = 0  # NOT USED!!!!!!
+		var_cost = np.zeros(len(px))
+
+		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
+
+		# iterate over path and calculate cost
+		for kk in range(len(px)):  # Iterate over length of trajectory
+			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
+				var_cost[kk] = Config.border_variance_penalty
+				control_cost += 0
+			else:
+				A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
+				var_cost[kk] = 1 / (np.dot(A_z.T, self.var_x)[0][0])
+				control_cost += 0
+		return np.sum(var_cost) * plength
 
 	def draw_graph(self, plot=None):
-		# plt.clf()
 		if plot is None:  # use built in plt
 			for node in self.node_list:
 				plt.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]))

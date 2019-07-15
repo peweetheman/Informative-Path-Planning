@@ -11,7 +11,7 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 import Config
 import gp_scripts
 import control_scripts
-from RRT_star import RRT_star
+from RRT_star_control import RRT_star
 from PRM_star_Dubins_control import PRM_star_Dubins
 import plot_scripts
 from true_field import true_field
@@ -62,11 +62,20 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 		print("Calc. time GMRF: /", "{0:.2f}".format(time_4 - time_3))
 
 		# Calculate optimal control path
+
 		# u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
 		# rrt_star = None
 
-		PRM_star = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params)
-		path_optimal, u_optimal, tau_optimal = PRM_star.control_algorithm()
+		# PRM_star = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params)
+		# path_optimal, u_optimal, tau_optimal, dubins_time = PRM_star.control_algorithm()
+		# print("dubins planner time: ", dubins_time)
+		# x_auv = tau_optimal[:, 3]
+		# tau_x = None
+
+		RRT_star1 = RRT_star(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params)
+		path_optimal, u_optimal, tau_optimal, dubins_time, rewire_time = RRT_star1.control_algorithm()
+		print("dubins planner time: ", dubins_time)
+		print("rewire time: ", rewire_time)
 		x_auv = tau_optimal[:, 3]
 		tau_x = None
 
@@ -74,6 +83,6 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 		print("Calc. time control script: /", "{0:.2f}".format(time_5 - time_4))
 
 		# Plot new GMRF belief and optimal control path
-		plot_scripts.update_animation1(PRM_star, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
+		plot_scripts.update_animation1(RRT_star1, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
 		time_6 = time.time()
 		print("Calc. time Plot: /", "{0:.2f}".format(time_6 - time_5))

@@ -216,9 +216,9 @@ def generate_course(length, mode, c):
 	for m, l in zip(mode, length):
 		pd = 0.0
 		if m == "S":
-			d = .2 / c
+			d = .3 * c
 		else:  # turning case
-			d = .2 / c
+			d = .3 * c
 
 
 		while pd < abs(l - d):
