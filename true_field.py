@@ -26,16 +26,17 @@ class true_field:
 			Y = np.atleast_2d([0, 1, 3, 4, 5])  # Specifies row coordinates of field
 			self.x_field = np.arange(Config.field_dim[0], Config.field_dim[1], 1e-2)
 			self.y_field = np.arange(Config.field_dim[2], Config.field_dim[3], 1e-2)
-			f = scipy.interpolate.interp2d(X, Y, z, kind='cubic')
-			self.z_field = f(self.x_field, self.y_field)
+			self.f = scipy.interpolate.griddata(X, Y, z, method='cubic')
+			self.z_field = self.f(self.x_field, self.y_field)
+
 		if set_field == False:
 			"""Field from GMRF"""
 			car_var = False
 			kappa_field = [1]  # Kappa
 			alpha_field = [0.01]  # Alpha
 
-			f = gp_scripts.sample_from_GMRF(Config.gmrf_dim, kappa_field, alpha_field, car_var, plot_gmrf=False)
+			self.f = gp_scripts.sample_from_GMRF(Config.gmrf_dim, kappa_field, alpha_field, car_var, plot_gmrf=False)
 
 			self.x_field = np.arange(Config.field_dim[0], Config.field_dim[1], 1e-2)
 			self.y_field = np.arange(Config.field_dim[2], Config.field_dim[3], 1e-2)
-			self.z_field = f(self.x_field, self.y_field)
+			self.z_field = self.f(self.x_field, self.y_field)

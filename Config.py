@@ -23,7 +23,8 @@ field_dim = [0, 10, 0, 5]  # x_min , x_max, y_min, y_max
 # Simulation variables
 sigma_w_squ = 0.2 ** 2  # Measurement variance
 sample_time_gmrf = 100  # Sample/Calculation time in ms of GMRF algorithm
-simulation_end_time = 20000  # Run time of simulation in ms
+simulation_end_time = 2000000  # Run time of simulation in ms
+simulation_max_dist = 20   # max distance of path for simulation tests
 
 """Choose GMRF parameters"""
 gmrf_dim = [50, 25, 15, 15]  # lxf, lyf, dvx, dvy

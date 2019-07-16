@@ -17,6 +17,7 @@ import plot_scripts
 from true_field import true_field
 import time
 from scipy import sqrt
+from scipy.interpolate import griddata
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
@@ -47,6 +48,8 @@ u_optimal = np.zeros(shape=(Config.N_horizon, 1))
 """START SIMULATION"""
 for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 	if time_in_ms % Config.sample_time_gmrf < 0.0000001:
+		print("shape of gmrf1", gmrf1.var_x.shape)
+		print("shape of truefield.z", true_field1.z_field.shape)
 		# Calculate next AUV state
 		# x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, field_limits)
 		trajectory_1 = np.vstack([trajectory_1, x_auv])
@@ -75,7 +78,7 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 		RRT_star1 = RRT_star(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params)
 		path_optimal, u_optimal, tau_optimal, dubins_time, rewire_time = RRT_star1.control_algorithm()
 		print("dubins planner time: ", dubins_time)
-		print("rewire time: ", rewire_time)
+		print("steer time: ", rewire_time)
 		x_auv = tau_optimal[:, 3]
 		tau_x = None
 
@@ -86,3 +89,27 @@ for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 		plot_scripts.update_animation1(RRT_star1, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
 		time_6 = time.time()
 		print("Calc. time Plot: /", "{0:.2f}".format(time_6 - time_5))
+
+		# terminate after trajectory length exceeds bound
+
+
+# CODE FOR BENCHMARKING
+(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = gmrf1.params
+# sum of variances
+total_variance_sum = np.sum(gmrf1.var_x)
+field_variance_sum = 0
+for nx in range(15, 65):
+	for ny in range(15, 40):
+		field_variance_sum += gmrf1.var_x[(ny * lx) + nx]
+
+# RMSE of mean in field bounds
+mean_RMSE = 0
+# grid_x, grid_y = np.mgrid[0:10:.204, 0:5:.206]
+# true_mean = true_field1.f(grid_x, grid_y)
+
+for nx in range(15, 65):
+	for ny in range(15, 40):
+		print("gmrf mean x, y, z: ", de[0] * nx + xg_min, de[1] * ny + yg_min, gmrf1.mue_x[(ny * lx) + nx])
+		print("true field mean x, y, z: ", de[0] * nx + xg_min, de[1] * ny + yg_min, true_field1.f(de[0] * nx + xg_min, de[1] * ny + yg_min))
+		mean_RMSE += (gmrf1.mue_x[(ny * lx) + nx] - true_field1.f(de[0] * nx + xg_min, de[1] * ny + yg_min)) ** 2
+mean_RMSE = sqrt(mean_RMSE)

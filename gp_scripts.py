@@ -320,7 +320,7 @@ def sample_from_GMRF(gmrf_dim, kappa, alpha, car_var, plot_gmrf=False):
 
 	# Calculate precision matrix
 	Q_storage = calculate_precision_matrix(lx1, ly1, kappa[0], alpha[0], car1=car_var)
-	# Draw sampel from GMRF
+	# Draw sample from GMRF
 	mue_Q = 10
 	z_I = np.random.standard_normal(size=lx1 * ly1)
 	x_Q = np.zeros(shape=(ly1, lx1, len(kappa)))
@@ -378,14 +378,22 @@ class GMRF:
 		x_min, x_max, y_min, y_max = Config.field_dim
 		lxf, lyf, dvx, dvy = gmrf_dim
 
-		lx = lxf + 2 * dvx  # Total number of GMRF vertices in x
-		ly = lyf + 2 * dvy
-		n = lx * ly
+		lx = lxf + 2 * dvx  # Total number of GMRF vertices across x dimension
+		print("size of lx: ", lx)
+		ly = lyf + 2 * dvy  # Total number of GMRF vertices across x dimension
+		print("size of ly: ", ly)
+		n = lx * ly         # Total number of GMRF vertices
+		print("size of n: ", n)
 		de = np.array([float(x_max - x_min) / (lxf - 1), float(y_max - y_min) / (lyf - 1)])  # Element width in x and y
+		print("value of de: ", de)
 		xg_min = x_min - dvx * de[0]  # Min GMRF field value in x
+		print("xg_min: ", xg_min)
 		xg_max = x_max + dvx * de[0]
+		print("xg_max: ", xg_max)
 		yg_min = y_min - dvy * de[1]
+		print("yg_min: ", yg_min)
 		yg_max = y_max + dvy * de[1]
+		print("yg_max: ", yg_max)
 
 		"""Intialize GMRF PRECISION matrices"""
 		p = 1  # Number of regression coefficients beta
@@ -457,7 +465,7 @@ class GMRF:
 		self.mue_theta = np.zeros(shape=(n + p, l_TH))
 		self.mue_x = np.zeros(shape=(n + p, 1))
 		self.var_x = np.zeros(shape=(n + p, 1))
-
+		print("size of p: ", p)
 		self.params = (lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max)
 
 	def gmrf_bayese_update(self, x_auv, y_t):

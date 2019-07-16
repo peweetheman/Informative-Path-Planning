@@ -33,20 +33,19 @@ class RRT_star:
 		self.gmrf_params = gmrf_params
 		self.max_curvature = max_curvature
 		self.local_planner_time = 0.0
-		self.rewire_time = 0.0
+		self.method_time = 0.0
 
 	def control_algorithm(self):
 		for i in range(self.max_iter):
 			sample = self.get_sample()
 			nearest_node = self.nearest_node(sample)
 			new_node = self.steer(nearest_node, sample)
-
 			if self.check_collision(new_node.pose[0], new_node.pose[1]):
 				near_nodes = self.get_near_nodes(new_node)
-				self.set_parent(new_node, near_nodes)
+				self.set_parent(new_node, near_nodes)        # half the time
 				self.node_list.append(new_node)
-				self.rewire(new_node, near_nodes)
-			# draw added edges
+				self.rewire(new_node, near_nodes)           # slightly less than half the time
+		# draw added edges
 			# self.draw_graph()
 		# generate path
 		last_node = self.get_best_last_node()
@@ -54,7 +53,7 @@ class RRT_star:
 			print("no best last node!")
 			return None
 		path, u_optimal, tau_optimal = self.get_path(last_node)
-		return path, u_optimal, tau_optimal, self.local_planner_time, self.rewire_time
+		return path, u_optimal, tau_optimal, self.local_planner_time, self.method_time
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
@@ -126,6 +125,7 @@ class RRT_star:
 		new_node.u = u
 		new_node.dist = new_node.parent.dist + plength
 
+
 	def get_best_last_node(self):
 		cost_list = []
 		for node in self.node_list:
@@ -160,7 +160,6 @@ class RRT_star:
 		return near_nodes
 
 	def rewire(self, new_node, near_nodes):
-		p1 = time.time()
 		for near_node in near_nodes:
 			p1 = time.time()
 			px, py, pangle, mode, plength, u = plan.dubins_path_planning(near_node.pose[0], near_node.pose[1], near_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
@@ -176,8 +175,6 @@ class RRT_star:
 					near_node.path_angle = pangle
 					near_node.u = u
 					near_node.dist = near_node.parent.dist + plength
-		self.rewire_time += (time.time() - p1)
-
 
 	def check_collision_path(self, px, py):
 		# check for collision on path
@@ -200,7 +197,7 @@ class RRT_star:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, px, py, pangle, plength):
+	def cost(self, px, py, pangle, plength):          # more than 2/3 of time here and the rest of time in dubins path planner
 		control_cost = 0        # NOT USED!!!!!!
 		var_cost = np.zeros(len(px))
 
@@ -212,7 +209,9 @@ class RRT_star:
 				var_cost[kk] = Config.border_variance_penalty
 				control_cost += 0
 			else:
+				p1 = time.time()
 				A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
+				self.method_time += (time.time() - p1)
 				var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
 				control_cost += 0
 		return np.sum(var_cost) * plength

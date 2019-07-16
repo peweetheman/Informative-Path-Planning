@@ -94,6 +94,7 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 	ax0 = fig1.add_subplot(221)
 	ax0.set_title("True Field")
 	cp = plt.contourf(true_field.x_field, true_field.y_field, true_field.z_field, vmin=vmin, vmax=vmax, levels=levels)
+	plt.colorbar(cp)
 	plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
 
 	if PlotField == True:
@@ -103,6 +104,7 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 		c1 = ax1.contourf(np.linspace(xg_min, xg_max, num=lx, endpoint=True),
 						  np.linspace(yg_min, yg_max, num=ly, endpoint=True),
 						  mue_x_plot, vmin=vmin, vmax=vmax, levels=levels)
+		plt.colorbar(c1)
 		plt.scatter(xv, yv, marker='+', facecolors='dimgrey')
 		plt.plot([x_min, x_min, x_max, x_max, x_min], [y_min, y_max, y_max, y_min, y_min], "k")
 		plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
@@ -124,6 +126,7 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 		c2 = ax2.contourf(np.linspace(xg_min, xg_max, num=lx, endpoint=True),
 						  np.linspace(yg_min, yg_max, num=ly, endpoint=True),
 						  var_x_plot, 10, vmin=var_min, vmax=var_max)
+		plt.colorbar(c2)
 		plt.scatter(xv, yv, marker='+', facecolors='dimgrey')
 		plt.plot([x_min, x_min, x_max, x_max, x_min], [y_min, y_max, y_max, y_min, y_min], "k")
 		plt.plot(trajectory_1[:, 0], trajectory_1[:, 1], color='yellow')
@@ -139,6 +142,7 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 		c1 = ax1.contourf(np.linspace(x_min, x_max, num=lxf, endpoint=True),
 						  np.linspace(y_min, y_max, num=lyf, endpoint=True),
 						  mue_x_plot[dvy:(lyf + dvy), dvx:(lxf + dvx)], vmin=vmin, vmax=vmax, levels=levels)
+		plt.colorbar(c1)
 		# plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
 		plt.plot(x_auv[0], x_auv[1], marker='o', markerfacecolor='none')
 
@@ -148,6 +152,7 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 		c2 = ax2.contourf(np.linspace(x_min, x_max, num=lxf, endpoint=True),
 						  np.linspace(y_min, y_max, num=lyf, endpoint=True),
 						  var_x_plot[dvy:(lyf + dvy), dvx:(lxf + dvx)], 10, vmin=var_min, vmax=var_max)
+		plt.colorbar(c2)
 		# plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
 		plt.plot(trajectory_1[:, 0], trajectory_1[:, 1], color='yellow')
 
