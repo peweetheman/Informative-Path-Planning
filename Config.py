@@ -9,7 +9,6 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 """
 
 import numpy as np
-import scipy
 from scipy import exp, sin, cos, sqrt, pi, interpolate
 
 """Configure the simulation parameters"""
@@ -80,7 +79,7 @@ n_k = 10  # Number of virtual roll-out pathes
 n_horizon = 10  # Control horizon length in s
 N_horizon = 10  # Number of discrete rollout points
 t_cstep = n_horizon / N_horizon  # Control horizon step size in s
-sigma_epsilon = scipy.pi / 16  # Exploration noise in radians, 90 grad = 1,57
+sigma_epsilon = pi / 16  # Exploration noise in radians, 90 grad = 1,57
 R_cost = 5 * np.ones(shape=(1, 1))  # Immediate control cost
 border_variance_penalty = 5
 pi_parameters = (n_updates, n_k, n_horizon, N_horizon, t_cstep, sigma_epsilon, R_cost)
@@ -152,14 +151,14 @@ def interpolation_matrix(x_local2, n, p, lx, xg_min, yg_min, de):
 	u1 = np.zeros(shape=(n + p, 1)).astype(float)
 	nx = int((x_local2[0] - xg_min) / de[0])  # Calculates the vertice column x-number at which the shape element starts.
 	ny = int((x_local2[1] - yg_min) / de[1])  # Calculates the vertice row y-number at which the shape element starts.
-
 	# Calculate position value in element coord-sys in meters
 	x_el = float(0.1 * (x_local2[0] / 0.1 - int(x_local2[0] / 0.1))) - de[0] / 2
 	y_el = float(0.1 * (x_local2[1] / 0.1 - int(x_local2[1] / 0.1))) - de[1] / 2
-
 	# Define shape functions, "a" is element width in x-direction
 	u1[(ny * lx) + nx] = (1 / (de[0] * de[1])) * ((x_el - de[0] / 2) * (y_el - de[1] / 2))  # u for lower left corner
 	u1[(ny * lx) + nx + 1] = (-1 / (de[0] * de[1])) * ((x_el + de[0] / 2) * (y_el - de[1] / 2))  # u for lower right corner
 	u1[((ny + 1) * lx) + nx] = (-1 / (de[0] * de[1])) * ((x_el - de[0] / 2) * (y_el + de[1] / 2))  # u for upper left corner
 	u1[((ny + 1) * lx) + nx + 1] = (1 / (de[0] * de[1])) * ((x_el + de[0] / 2) * (y_el + de[1] / 2))  # u for upper right corner
+
+
 	return u1

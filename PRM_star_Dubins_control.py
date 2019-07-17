@@ -32,6 +32,7 @@ class PRM_star_Dubins:
 		self.gmrf_params = gmrf_params
 		self.max_curvature = max_curvature
 		self.local_planner_time = 0.0
+		self.method_time = 0.0
 
 
 	def control_algorithm(self):
@@ -53,7 +54,7 @@ class PRM_star_Dubins:
 		if last_node is None:
 			return None
 		path, u_optimal, tau_optimal = self.get_path(last_node)
-		return path, u_optimal, tau_optimal, self.local_planner_time
+		return path, u_optimal, tau_optimal, self.local_planner_time, self.method_time
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
@@ -164,9 +165,11 @@ class PRM_star_Dubins:
 				var_cost[kk] = Config.border_variance_penalty
 				control_cost += 0
 			else:
+				p1 = time.time()
 				A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
 				var_cost[kk] = 1 / (np.dot(A_z.T, self.var_x)[0][0])
 				control_cost += 0
+				self.method_time += (time.time() - p1)
 		return np.sum(var_cost) * plength
 
 	def draw_graph(self, plot=None):

@@ -21,12 +21,12 @@ def initialize_animation1(true_field, x_auv, vmin, vmax, var_min, var_max, level
 	kappa_prior = Config.kappa_prior
 
 	plt.ion()
-	fig1 = plt.figure(figsize=(8, 3))
+	fig1 = plt.figure(figsize=(9, 4))
 
 	ax0 = fig1.add_subplot(221)
 	cp = plt.contourf(true_field.x_field, true_field.y_field, true_field.z_field, vmin=vmin, vmax=vmax, levels=levels)
 	plt.colorbar(cp)
-	plt.title('True Field')
+	ax0.set_title('True Field')
 	plt.xlabel('x (m)')
 	plt.ylabel('y (m)')
 

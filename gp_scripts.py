@@ -320,7 +320,7 @@ def sample_from_GMRF(gmrf_dim, kappa, alpha, car_var, plot_gmrf=False):
 
 	# Calculate precision matrix
 	Q_storage = calculate_precision_matrix(lx1, ly1, kappa[0], alpha[0], car1=car_var)
-	# Draw sample from GMRF
+	# Draw sampel from GMRF
 	mue_Q = 10
 	z_I = np.random.standard_normal(size=lx1 * ly1)
 	x_Q = np.zeros(shape=(ly1, lx1, len(kappa)))
@@ -387,13 +387,10 @@ class GMRF:
 		de = np.array([float(x_max - x_min) / (lxf - 1), float(y_max - y_min) / (lyf - 1)])  # Element width in x and y
 		print("value of de: ", de)
 		xg_min = x_min - dvx * de[0]  # Min GMRF field value in x
-		print("xg_min: ", xg_min)
 		xg_max = x_max + dvx * de[0]
-		print("xg_max: ", xg_max)
+
 		yg_min = y_min - dvy * de[1]
-		print("yg_min: ", yg_min)
 		yg_max = y_max + dvy * de[1]
-		print("yg_max: ", yg_max)
 
 		"""Intialize GMRF PRECISION matrices"""
 		p = 1  # Number of regression coefficients beta
