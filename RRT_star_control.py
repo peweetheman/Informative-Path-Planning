@@ -156,7 +156,7 @@ class RRT_star:
 		nnode = len(self.node_list)
 		r = min(30.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 10.0)
 		dlist = [dist(node, new_node) for node in self.node_list]
-		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r ** 2]
+		near_nodes = [self.node_list[dlist.index(d)] for d in dlist if d <= r]
 		return near_nodes
 
 	def rewire(self, new_node, near_nodes):

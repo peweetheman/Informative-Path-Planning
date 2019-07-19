@@ -16,3 +16,12 @@ class Node(object):
 
 	def __eq__(self, other):
 		return self.__dict__ == other.__dict__
+
+	def __len__(self):
+		return len(self.pose)
+
+	def __getitem__(self, i):
+		return self.pose[i]
+
+	def __repr__(self):
+		return 'Item({}, {}, {})'.format(self.coords[0], self.coords[1], self.data)

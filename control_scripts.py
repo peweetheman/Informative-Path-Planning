@@ -11,6 +11,7 @@ import Config
 import numpy as np
 from scipy import exp, sin, cos, sqrt, pi, interpolate
 from random import randint
+import time
 
 
 def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_limits, set_sanity_check):
@@ -59,7 +60,6 @@ def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_lim
 					pre_x_tau[kk, jj] = 1 / np.dot(A_z.T, var_x)
 					control_cost[kk, jj] = .5 * np.dot(np.array(u_optimal[kk] + epsilon_auv[kk, jj]).T,
 														np.dot(R_cost, np.array(u_optimal[kk] + epsilon_auv[kk, jj])))
-
 			for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory
 				S_tau[kk, jj] = np.sum(pre_x_tau[kk:, jj]) + np.sum(control_cost[kk:, jj])
 			for kk in range(0, N_horizon):  # Iterate over whole sampeld trajectory

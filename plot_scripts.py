@@ -156,6 +156,14 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 		# plt.scatter(xv[dvy:(lyf+dvy), dvx:(lxf+dvx)], yv[dvy:(lyf+dvy), dvx:(lxf+dvx)], marker='+', facecolors='dimgrey')
 		plt.plot(trajectory_1[:, 0], trajectory_1[:, 1], color='yellow')
 
+		if sampling_control is not None:
+			time1 = time.time()
+			sampling_control.draw_graph(plot=plt)
+			print("calc time sampling algo plotting: ", time.time() - time1)
+
+		plt.quiver(x_auv[0], x_auv[1], np.cos(x_auv[2]), np.sin(x_auv[2]), width=.005)
+		plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
+
 		if tau_x is not None:
 			for jj in range(0, Config.n_k):  # Iterate over all trajectories
 				plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
@@ -164,15 +172,6 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 			ax3.set_title("Hyperparameter estimate")
 		# colors = plt.cm.jet(pi_theta.flatten() / float(pi_theta.max()))  # Color height dependent
 		# ax3.bar3d(x, y, bottom, 1, 1, pi_theta, color=colors, alpha=0.5)
-
-
-		if sampling_control is not None:
-			time1 = time.time()
-			sampling_control.draw_graph(plot=plt)
-			print("calc time sampling algo plotting: ", time.time() - time1)
-
-		plt.quiver(x_auv[0], x_auv[1], np.cos(x_auv[2]), np.sin(x_auv[2]), width=.005)
-		plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
 
 	fig1.canvas.draw_idle()
 	plt.pause(0.05)

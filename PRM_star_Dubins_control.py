@@ -129,7 +129,7 @@ class PRM_star_Dubins:
 		nnode = len(self.node_list)
 		r = min(30.0 * ((math.log(nnode) / nnode)) ** (1 / d), 10.0)
 		dlist = [dist(new_node, node) for node in self.node_list]
-		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r ** 2]
+		near_nodes = [self.node_list[dlist.index(d)] for d in dlist if d <= r]
 		return near_nodes
 
 	def rewire(self, new_node, near_nodes):
@@ -158,7 +158,7 @@ class PRM_star_Dubins:
 		var_cost = np.zeros(len(px))
 
 		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
-
+		A = np.zeros(shape=(n + p, 1)).astype(float)
 		# iterate over path and calculate cost
 		for kk in range(len(px)):  # Iterate over length of trajectory
 			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
@@ -167,8 +167,9 @@ class PRM_star_Dubins:
 			else:
 				p1 = time.time()
 				A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
-				var_cost[kk] = 1 / (np.dot(A_z.T, self.var_x)[0][0])
+				var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
 				control_cost += 0
+				A = A + Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)    # for first summing then dotting
 				self.method_time += (time.time() - p1)
 		return np.sum(var_cost) * plength
 
