@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class RRT_star:
 	# RRT ALGORITHM USING DUBINS PATHS FOR FINDING PATH FROM START TO END LOCATION
 
-	def __init__(self, start, end, space, obstacles, growth=0.5, max_iter=50, end_sample_percent=5):
+	def __init__(self, start, end, space, obstacles, growth=0.5, max_iter=50, end_sample_percent=5, max_curvature=1.0):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location
@@ -30,13 +30,13 @@ class RRT_star:
 		self.max_iter = max_iter
 		self.obstacles = obstacles
 		self.node_list = [self.start]
+		self.max_curvature = max_curvature
 
 	def rrt_star_algorithm(self):
 		for i in range(self.max_iter):
 			sample_node = self.get_sample()
 
 			if self.check_collision(sample_node):
-				print("here: ", sample_node.pose)
 				near_nodes = self.get_near_nodes(sample_node)
 				new_node = self.set_parent(sample_node, near_nodes)
 				if new_node is None:    # no possible path from any of the near nodes
@@ -65,8 +65,7 @@ class RRT_star:
 
 	def steer(self, source_node, destination_node):
 		# take source_node and find path to destination_node
-		curvature = 1.0
-		px, py, pyaw, mode, clen, u = plan.dubins_path_planning(source_node.pose[0], source_node.pose[1], source_node.pose[2], destination_node.pose[0], destination_node.pose[1], destination_node.pose[2], curvature)
+		px, py, pyaw, mode, clen, u = plan.dubins_path_planning(source_node.pose[0], source_node.pose[1], source_node.pose[2], destination_node.pose[0], destination_node.pose[1], destination_node.pose[2], self.max_curvature)
 		new_node = copy.deepcopy(source_node)
 		new_node.pose = destination_node.pose
 		new_node.path_x = px
@@ -117,9 +116,9 @@ class RRT_star:
 		# for asymptotical completeness see Kalman 2011. gamma = 1 satisfies
 		d = 2  # dimension of the self.space
 		nnode = len(self.node_list)
-		r = min(50.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 20.0)
+		r = min(20.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 5.0)
 		dlist = [dist(node, sample_node) for node in self.node_list]
-		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r ** 2]
+		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r]
 		return near_nodes
 
 	def rewire(self, new_node, near_nodes):
@@ -148,7 +147,6 @@ class RRT_star:
 
 	def draw_graph(self):
 		plt.clf()
-
 		for node in self.node_list:
 			plt.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]))
 			if node.parent is not None:
@@ -163,7 +161,7 @@ class RRT_star:
 
 		plt.axis(self.space)
 		plt.grid(True)
-		plt.title("RRT* (distance dist function)")
+		plt.title("PRM* (distance dist function)")
 
 		plt.pause(.1)   # need for animation
 

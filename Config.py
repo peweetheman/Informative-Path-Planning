@@ -22,7 +22,7 @@ field_dim = [0, 10, 0, 5]  # x_min , x_max, y_min, y_max
 # Simulation variables
 sigma_w_squ = 0.2 ** 2  # Measurement variance
 sample_time_gmrf = 100  # Sample/Calculation time in ms of GMRF algorithm
-simulation_end_time = 2000000  # Run time of simulation in ms
+simulation_end_time = 20000 # Run time of simulation in ms
 simulation_max_dist = 20   # max distance of path for simulation tests
 
 """Choose GMRF parameters"""
@@ -159,6 +159,4 @@ def interpolation_matrix(x_local2, n, p, lx, xg_min, yg_min, de):
 	u1[(ny * lx) + nx + 1] = (-1 / (de[0] * de[1])) * ((x_el + de[0] / 2) * (y_el - de[1] / 2))  # u for lower right corner
 	u1[((ny + 1) * lx) + nx] = (-1 / (de[0] * de[1])) * ((x_el - de[0] / 2) * (y_el + de[1] / 2))  # u for upper left corner
 	u1[((ny + 1) * lx) + nx + 1] = (1 / (de[0] * de[1])) * ((x_el + de[0] / 2) * (y_el + de[1] / 2))  # u for upper right corner
-
-
 	return u1

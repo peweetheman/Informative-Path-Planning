@@ -4,8 +4,9 @@ class Node(object):
 	def __init__(self, pose):
 		self.parent = None
 		self.cost = 0.0
+		self.gain = 0.0
 		self.dist = 0.0
-		self.pose = np.array(pose)           # x-coordinate, y-coordinate, angle-coordinate constitutes a pose
+		self.pose = np.array(pose)           # x-coordinate, y-coordinate, angle-coordinate (in radians) constitutes a pose
 		self.u = []                # list of controls required to get from parent node to this node
 
 		#self.path = []             # list of poses on the way from parent node to this node
@@ -24,4 +25,4 @@ class Node(object):
 		return self.pose[i]
 
 	def __repr__(self):
-		return 'Item({}, {}, {})'.format(self.coords[0], self.coords[1], self.data)
+		return 'Node Pos({}, {}, {})'.format(self.pose[0], self.pose[1], self.pose[2])

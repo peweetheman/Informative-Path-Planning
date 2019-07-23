@@ -43,13 +43,11 @@ class RRT_star:
 
 			if self.check_collision(new_node.pose[0], new_node.pose[1]):
 				near_nodes = self.get_near_nodes(new_node)
-				self.set_parent(new_node, near_nodes)
-				if new_node.parent is None:    # no possible path from any of the near nodes
+				if new_node.parent is None:  # no possible path from any of the near nodes
 					print("new_node.parent is none (printed in main algo)")
 					continue
 				self.node_list.append(new_node)
-				self.rewire(new_node, near_nodes)
-		# draw added edges
+			# draw added edges
 			self.draw_graph()
 		# generate path
 		last_node = self.get_best_last_node()
@@ -61,17 +59,19 @@ class RRT_star:
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
-					  random.uniform(self.space[2], self.space[3]),
-					  random.uniform(-math.pi, math.pi)])
+					   random.uniform(self.space[2], self.space[3]),
+					   random.uniform(-math.pi, math.pi)])
 		return sample
 
 	def steer(self, source_node, dest_node):
 		# take source_node and steer towards destination node
 		dtheta = random.uniform(-self.max_curvature, self.max_curvature)
-		dx = np.cos(source_node.pose[2] + dtheta/2)
-		dy = np.sin(source_node.pose[2] + dtheta/2)
+		dx = np.cos(source_node.pose[2] + dtheta / 2)
+		dy = np.sin(source_node.pose[2] + dtheta / 2)
 		vec = np.array([dx, dy, dtheta])
 		new_node = Node(source_node.pose + self.growth * vec)
+		new_node.parent = source_node
+		new_node.cost = new_node.parent.cost + self.cost()
 		return new_node
 
 	def set_parent(self, new_node, near_nodes):
@@ -98,12 +98,12 @@ class RRT_star:
 			return
 		new_node.cost = mincost
 		new_node.parent = min_node
-		
+
 		# CALL TO LOCAL PATH PLANNER
 		p1 = time.time()
 		px, py, pangle, mode, plength, u = plan.dubins_path_planning(min_node.pose[0], min_node.pose[1], min_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
 		p2 = time.time()
-		self.local_planner_time += (p2-p1)
+		self.local_planner_time += (p2 - p1)
 		new_node.path_x = px
 		new_node.path_y = py
 		new_node.path_angle = pangle
@@ -169,7 +169,7 @@ class RRT_star:
 
 	def check_collision(self, x_node, y_node):
 		if self.obstacles is None:
-			return True   # safe
+			return True  # safe
 		for (x, y, side) in self.obstacles:
 			if (x_node > x - .8 * side / 2) and (x_node < x + .8 * side / 2) and (y_node > y - side / 2) and (y_node < y + side / 2):
 				return False  # collision
@@ -181,14 +181,14 @@ class RRT_star:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, px, py, pangle, plength):          # more than 2/3 of time here and the rest of time in dubins path planner
-		control_cost = 0        # NOT USED!!!!!!
+	def cost(self, px, py, pangle, plength):  # more than 2/3 of time here and the rest of time in dubins path planner
+		control_cost = 0  # NOT USED!!!!!!
 		var_cost = np.zeros(len(px))
 
 		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
 
-		#iterate over path and calculate cost
-		for kk in range(len(px)):      # Iterate over length of trajectory
+		# iterate over path and calculate cost
+		for kk in range(len(px)):  # Iterate over length of trajectory
 			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
 				var_cost[kk] = Config.border_variance_penalty
 				control_cost += 0
@@ -196,7 +196,7 @@ class RRT_star:
 				p1 = time.time()
 				A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
 				self.method_time += (time.time() - p1)
-				var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
+				var_cost[kk] = 1 / (np.dot(A_z.T, self.var_x)[0][0])
 				control_cost += 0
 		return np.sum(var_cost) * plength
 
@@ -235,11 +235,12 @@ class RRT_star:
 			plot.title("RRT* (distance cost function)")
 			plot.pause(.1)  # need for animation
 
+
 def dist(node1, node2):
 	# returns distance between two nodes
 	return math.sqrt((node2.pose[0] - node1.pose[0]) ** 2 +
 					 (node2.pose[1] - node1.pose[1]) ** 2 +
-					 3 * min((node1.pose[2] - node2.pose[2]) ** 2, (node1.pose[2] - node2.pose[2] + 2*math.pi) ** 2, (node1.pose[2] - node2.pose[2] - 2*math.pi) ** 2))
+					 3 * min((node1.pose[2] - node2.pose[2]) ** 2, (node1.pose[2] - node2.pose[2] + 2 * math.pi) ** 2, (node1.pose[2] - node2.pose[2] - 2 * math.pi) ** 2))
 
 
 def main():
@@ -253,10 +254,9 @@ def main():
 		(9, 15, 4)]
 
 	# calling RRT*
-	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)],  space=[0, 30, 0, 30], obstacles=obstacles)
+	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)], space=[0, 30, 0, 30], obstacles=obstacles)
 	path, u_optimal, tau_optimal = rrt_star.control_algorithm()
 	print(u_optimal)
-
 
 	# plotting code
 	rrt_star.draw_graph()

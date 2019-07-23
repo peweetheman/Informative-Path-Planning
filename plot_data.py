@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-data = np.loadtxt("PRM*_data1.txt")
+data = np.loadtxt("PI_data122.txt")
 fig1 = plt.figure(figsize=(9, 4))
 print(data.shape)
 ax0 = fig1.add_subplot(221)

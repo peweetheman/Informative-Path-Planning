@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class RRT_star:
 	# Basic RRT* algorithm using distance as dist function
 
-	def __init__(self, start, space, obstacles, growth=1, max_iter=100, max_dist=20):
+	def __init__(self, start, goal, space, obstacles, growth=4.0, max_iter=100, max_dist=40, max_curvature=1.0, end_sample_percent=15):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location
@@ -23,81 +23,115 @@ class RRT_star:
 		:param end_sample_percent: percent chance to get sample from goal location
 		"""
 		self.start = Node(start)
+		self.end = Node(goal)
 		self.space = space
 		self.growth = growth
 		self.max_iter = max_iter
 		self.max_dist = max_dist
 		self.obstacles = obstacles
 		self.node_list = [self.start]
+		self.max_curvature = max_curvature
+		self.local_planner_time = 0.0
+		self.end_sample_percent = end_sample_percent
 
 	def control_algorithm(self):
 		# RRT* ALGORITHM
 		for i in range(self.max_iter):
 			sample_node = self.get_sample()
 			nearest_node = self.nearest_node(sample_node)
-			new_node = self.steer(sample_node, nearest_node)
+			new_node = self.steer(nearest_node, sample_node)
 
-			if self.check_collision(new_node):
-				near_nodes = self.get_near_nodes(sample_node)
-				self.set_parent(sample_node, near_nodes)
-				if new_node is None:    # no possible path from any of the near nodes
+			if self.check_collision(new_node.pose[0], new_node.pose[1]):
+				near_nodes = self.get_near_nodes(new_node)
+				self.set_parent(new_node, near_nodes)
+				if new_node.parent is None:    # no possible path from any of the near nodes
 					continue
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
 			# animate added edges
-			self.draw_graph()
+				#self.draw_near(near_nodes, new_node, new_node)
+				print("portion of dubins: ", self.local_planner_time/time.time())
 
 		# generate path
 		last_node = self.get_best_last_node()
 		if last_node is None:
-			return None
+			return None, None, None
 		path, u_optimal, tau_optimal = self.get_path(last_node)
 		return path, u_optimal, tau_optimal
 
 	def get_sample(self):
-		sample = Node([random.uniform(self.space[0], self.space[1]),
-					  random.uniform(self.space[2], self.space[3]),
-					  random.uniform(-math.pi, math.pi)])
+		if random.randint(0, 100) > self.end_sample_percent:
+			sample = Node([random.uniform(self.space[0], self.space[1]),
+						  random.uniform(self.space[0], self.space[1]),
+						  random.uniform(-math.pi, math.pi)])
+		else:  # end point sampling
+			sample = Node(self.end.pose)
 		return sample
 
-	def steer(self, source_node, destination_node):
+	def steer_2(self, source_node, dest_node):
 		# take source_node and steer towards destination node
-		vec = np.array((destination_node.pose[0] - source_node.pose[0], destination_node.pose[1] - source_node.pose[1], destination_node.pose[2] - source_node.pose[2]))
-		unit_vec = vec / np.linalg.norm(vec)
-		new_node = Node(source_node.pose)
-		currentDistance = dist(source_node, destination_node)
-		# find a point within growth of nearest_node, and closest to sample
-		if currentDistance <= self.growth:
-			pass
-		else:
-			new_node.pose[0] = destination_node.pose[0] + self.growth * unit_vec[0]
-			new_node.pose[1] = destination_node.pose[1] + self.growth * unit_vec[1]
-			new_node.pose[2] = destination_node.pose[2] + self.growth * unit_vec[2]
+		dtheta = np.array([-self.max_curvature, 0, self.max_curvature])
+		dx = np.cos(source_node.pose[2] + dtheta/2)
+		dy = np.sin(source_node.pose[2] + dtheta/2)
+		vec = np.array([dx, dy, dtheta])
+		new_node_list = [Node(source_node.pose + self.growth * vec[:, 0]), Node(source_node.pose + self.growth * vec[:, 1]), Node(source_node.pose + self.growth * vec[:, 2])]
+		d_list = [dist(new_node, dest_node) for new_node in new_node_list]
+		mindist = min(d_list)
+		new_node = new_node_list[d_list.index(mindist)]
 		new_node.cost = float("inf")
 		new_node.parent = None
 		return new_node
 
-	def set_parent(self, sample_node, near_nodes):
-		# connects new_node along a minimum cost path
-		if not near_nodes:
-			near_nodes.append(self.nearest_node(sample_node))
-		dlist = []
-		for near_node in near_nodes:
-			temp_node = self.steer(near_node, sample_node)
-			if self.check_collision(temp_node):
-				dlist.append(temp_node.dist)
-			else:
-				dlist.append(float("inf"))
-
-		mindist = min(dlist)
-		min_node = near_nodes[dlist.index(mindist)]
-		if mindist == float("inf"):
-			return None
-		new_node = self.steer(min_node, sample_node)
+	def steer(self, source_node, dest_node):
+		# take source_node and steer towards destination node
+		dtheta = random.uniform(-self.max_curvature, self.max_curvature)
+		dx = np.cos(source_node.pose[2] + dtheta/2)
+		dy = np.sin(source_node.pose[2] + dtheta/2)
+		vec = np.array([dx, dy, dtheta])
+		new_node = Node(source_node.pose + self.growth * vec)
 		return new_node
 
+	def set_parent(self, new_node, near_nodes):
+		# connects new_node along a minimum cost path
+		if not near_nodes:
+			near_nodes.append(self.nearest_node(new_node))
+		cost_list = []
+		for near_node in near_nodes:
+			# CALL TO LOCAL PATH PLANNER
+			p1 = time.time()
+			px, py, pangle, mode, plength, u = plan.dubins_path_planning(near_node.pose[0], near_node.pose[1], near_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+			p2 = time.time()
+			self.local_planner_time += (p2 - p1)
+			cost = self.cost(px, py, pangle, plength)
+			if self.check_collision_path(px, py) and self.max_dist >= plength + near_node.dist:
+				cost_list.append(near_node.cost + cost)
+			else:
+				cost_list.append(float("inf"))
+
+		mincost = min(cost_list)
+		min_node = near_nodes[cost_list.index(mincost)]
+		if mincost == float("inf"):
+			print("no parent found")
+			# self.draw_near(near_nodes, new_node, new_node)
+			return
+		new_node.cost = mincost
+		new_node.parent = min_node
+
+		# CALL TO LOCAL PATH PLANNER
+		p1 = time.time()
+		px, py, pangle, mode, plength, u = plan.dubins_path_planning(min_node.pose[0], min_node.pose[1], min_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+		p2 = time.time()
+		self.local_planner_time += (p2 - p1)
+		new_node.path_x = px
+		new_node.path_y = py
+		new_node.path_angle = pangle
+		new_node.u = u
+		new_node.dist = new_node.parent.dist + plength
+
 	def get_best_last_node(self):
-		cost_list = [node.cost for node in self.node_list]
+		cost_list = [node.cost for node in self.node_list if dist(node, self.end) < self.growth]
+		if cost_list is not False:
+			return None
 		best_node = self.node_list[cost_list.index(min(cost_list))]
 		return best_node
 
@@ -123,48 +157,45 @@ class RRT_star:
 		# for asymptotical completeness see Kalman 2011. gamma = 1 satisfies
 		d = 2  # dimension of the self.space
 		nnode = len(self.node_list)
-		r = min(50.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 20.0)
+		r = min(25.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 10.0)
 		dlist = [dist(node, new_node) for node in self.node_list]
-		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r ** 2]
+		near_nodes = [self.node_list[dlist.index(i)] for i in dlist if i <= r]
 		return near_nodes
 
 	def rewire(self, new_node, near_nodes):
+
 		for near_node in near_nodes:
-			temp_node = self.steer(new_node, near_node)
+			p1 = time.time()
+			px, py, pangle, mode, plength, u = plan.dubins_path_planning(near_node.pose[0], near_node.pose[1], near_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+			p2 = time.time()
+			self.local_planner_time += (p2 - p1)
+			temp_cost = new_node.cost + self.cost(px, py, pangle, plength)
+			if near_node.cost > temp_cost and self.max_dist >= new_node.dist + plength:
+				if self.check_collision_path(px, py):
+					#print("REWIRE")
+					#self.draw_near(near_nodes, new_node, near_node)
+					near_node.parent = new_node
+					near_node.cost = temp_cost
+					near_node.path_x = px
+					near_node.path_y = py
+					near_node.path_angle = pangle
+					near_node.u = u
+					near_node.dist = near_node.parent.dist + plength
+					#self.draw_near(near_nodes, new_node, near_node)
 
-			if near_node.dist > temp_node.dist and self.check_collision(temp_node):
-				# print("near node: ", near_node.dist)
-				# print("new node parent: ", new_node.parent.dist)
-				# self.draw_near(near_nodes, new_node, temp_node)
+	def check_collision_path(self, px, py):
+		# check for collision on path
+		for kk in range(len(px)):
+			if not self.check_collision(px[kk], py[kk]):
+				return False    # collision
+		return True      # safe
 
-				near_node.__dict__.update(vars(temp_node))
-
-				# print("REWIRED")
-				# self.draw_near(near_nodes, new_node, temp_node)
-
-	# def check_collision_path(self, node1, node2):
-	# 	# check for collision on path from node1 to node2
-	# 	dis = dist(node1, node2)
-	# 	dx = node2.pose[0] - node1.pose[0]
-	# 	dy = node2.pose[1] - node1.pose[1]
-	# 	angle = math.atan2(dy, dx)
-	# 	temp_node = copy.deepcopy(node1)
-	# 	for i in range(int(dis / self.growth)):
-	# 		temp_node.pose[0] += self.growth * math.cos(angle)
-	# 		temp_node.pose[1] += self.growth * math.sin(angle)
-	# 		if not self.check_collision(temp_node):
-	# 			return False
-	#
-	# 	return True
-
-	def check_collision(self, node):
+	def check_collision(self, nx, ny):
 		if self.obstacles is not None:
 			for (x, y, side) in self.obstacles:
-				for (nx, ny) in zip(node.path_x, node.path_y):
 					if ((nx > x - .8 * side / 2) & (nx < x + .8 * side / 2) & (ny > y - side / 2) & (
 								ny < y + side / 2)):
 						return False  # collision
-
 		return True  # safe
 
 	def nearest_node(self, sample):
@@ -172,61 +203,48 @@ class RRT_star:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, gmrf, path):
-		return 0
+	def cost(self, px, py, pangle, plength):
+		return plength
 
 	def draw_graph(self, plot=None):
-		# plt.clf()
-		if plot is None:             # use built in plt
-			for node in self.node_list:
-				plt.plot(node.pose[0], node.pose[1], "yH")
-				if node.parent is not None:
-					plt.plot(node.path_x, node.path_y, "-g")
+		for node in self.node_list:
+			plt.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]))
+			if node.parent is not None:
+				plt.plot(node.path_x, node.path_y, "-g")
 
-			if self.obstacles is not None:
-				for (x, y, side) in self.obstacles:
-					plt.plot(x, y, "sk", ms=8 * side)
+		if self.obstacles is not None:
+			for (x, y, side) in self.obstacles:
+				plt.plot(x, y, "sk", ms=8 * side)
 
-			plt.plot(self.start.pose[0], self.start.pose[1], "yo")
-			plt.axis(self.space)
-			plt.grid(True)
-			plt.title("RRT* (distance cost function)")
-			plt.pause(.1)   # need for animation
-
-		else:        # use plot of calling
-			for node in self.node_list:
-				plot.plot(node.pose[0], node.pose[1], "yH")
-				if node.parent is not None:
-					for (x, y) in zip(node.path_x, node.path_y):
-						plt.plot(x, y, "yH", markersize=2)
-
-			if self.obstacles is not None:
-				for (x, y, side) in self.obstacles:
-					plot.plot(x, y, "sk", ms=8 * side)
-
-			plot.plot(self.start.pose[0], self.start.pose[1], "yo")
-			plot.axis(self.space)
-			plot.grid(True)
-			plot.title("RRT* (distance cost function)")
-			plot.pause(.1)  # need for animation
+		plt.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="y")
+		plt.quiver(self.end.pose[0], self.end.pose[1], math.cos(self.end.pose[2]), math.sin(self.end.pose[2]), color="r")
+		plt.axis(self.space)
+		plt.grid(True)
+		plt.title("RRT* (Dubin's Curves, distance cost)")
+		plt.pause(.1)   # need for animation
 
 	def draw_near(self, near_nodes, new_node, temp_node):
 		plt.clf()
 
 		for node in self.node_list:
-			plt.plot(node.pose[0], node.pose[1], "yH")
+			plt.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]))
 			plt.text(node.pose[0], node.pose[1], str(node.dist), color="red", fontsize=12)
 			if node.parent is not None:
 				plt.plot(node.path_x, node.path_y, "-g")
-		plt.plot(temp_node.pose[0], temp_node.pose[1], "go")
-		plt.plot(new_node.pose[0], new_node.pose[1], "mo")
-		plt.text(new_node.pose[0], new_node.pose[1]-1, str(new_node.parent.pose[1]))
+
+		for node in near_nodes:
+			plt.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]), color="c")
 		plt.pause(.1)
 		if self.obstacles is not None:
 			for (x, y, side) in self.obstacles:
 				plt.plot(x, y, "sk", ms=8 * side)
 
-		plt.plot(self.start.pose[0], self.start.pose[1], "oy")
+		plt.quiver(temp_node.pose[0], temp_node.pose[1], math.cos(temp_node.pose[2]), math.sin(temp_node.pose[2]), color="m")
+		plt.quiver(new_node.pose[0], new_node.pose[1], math.cos(new_node.pose[2]), math.sin(new_node.pose[2]), color="m")
+		plt.plot(new_node.path_x, new_node.path_y, "m")
+
+		plt.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="y")
+		plt.quiver(self.end.pose[0], self.end.pose[1], math.cos(self.end.pose[2]), math.sin(self.end.pose[2]), color="r")
 		plt.axis(self.space)
 		plt.grid(True)
 		plt.title("RRT* (Dubin's Curves)")
@@ -240,7 +258,7 @@ def dist(node1, node2):
 
 def main():
 	start_time = time.time()
-	# squares of [x,y,side length]
+	# obstacles are squares of [x,y,side length]
 	obstacles = [
 		(15, 17, 7),
 		(4, 10, 6),
@@ -249,14 +267,14 @@ def main():
 		(9, 15, 4)]
 
 	# calling RRT*
-	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)],  space=[0, 30, 0, 30], obstacles=obstacles)
+	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)], goal=[15.0, 3.0, np.deg2rad(0.0)], space=[0, 30, 0, 30], obstacles=obstacles)
 	path, u_optimal, tau_optimal = rrt_star.control_algorithm()
 	print(u_optimal)
 
 	# plotting code
 	rrt_star.draw_graph()
-
-	plt.plot([node.pose[0] for node in path], [node.pose[1] for node in path], '-r')
+	# if path is not None:
+		# plt.plot([node.pose[0] for node in path], [node.pose[1] for node in path], '-r')
 	plt.grid(True)
 	print("--- %s seconds ---" % (time.time() - start_time))
 	plt.show()

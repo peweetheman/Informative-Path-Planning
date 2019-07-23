@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 
 class PRM_star_Dubins:
-	# PRM* algorithm using distance as dist function
+	# PRM* algorithm using reward as variance/length with bias towards longer paths
 
 	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, max_iter=30, max_dist=25, min_dist=3, max_curvature=1.0):
 		"""
@@ -58,8 +58,8 @@ class PRM_star_Dubins:
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
-					  random.uniform(self.space[2], self.space[3]),
-					  random.uniform(-math.pi, math.pi)])
+					   random.uniform(self.space[2], self.space[3]),
+					   random.uniform(-math.pi, math.pi)])
 		return sample
 
 	def steer(self, source_node, destination_node):
@@ -74,39 +74,39 @@ class PRM_star_Dubins:
 		new_node.path_angle = pangle
 		new_node.u = u
 		new_node.dist += plength
-		new_node.cost += self.cost(px, py, pangle, plength)
+		new_node.gain += self.reward(px, py, pangle)
 		new_node.parent = source_node
 		return new_node
 
 	def set_parent(self, sample_node, near_nodes):
-		# connects new_node along a minimum cost path
+		# connects new_node along a maximum reward path
 		if not near_nodes:
 			near_nodes.append(self.nearest_node(sample_node))
-		cost_list = []
+		gain_list = []
 		for near_node in near_nodes:
 			temp_node = self.steer(near_node, sample_node)
 			if self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
-				cost_list.append(temp_node.cost * temp_node.dist)
+				gain_list.append(temp_node.gain / temp_node.dist)
 			else:
-				cost_list.append(float("inf"))
+				gain_list.append(float("-inf"))
 
-		min_cost = min(cost_list)
-		min_node = near_nodes[cost_list.index(min_cost)]
+		max_gain = max(gain_list)
+		max_node = near_nodes[gain_list.index(max_gain)]
+		new_node = self.steer(max_node, sample_node)
 
-		new_node = self.steer(min_node, sample_node)
-		if new_node.cost == float("inf"):
-			print("min cost is inf")
+		if new_node.gain == float("-inf"):
+			print("max gain is -inf")
 			return None
 		return new_node
 
 	def get_best_last_node(self):
-		cost_list = []
+		gain_list = []
 		for node in self.node_list:
 			if node.dist >= self.min_dist:
-				cost_list.append(node.cost * node.dist)
+				gain_list.append(node.gain / node.dist)
 			else:
-				cost_list.append(float("inf"))
-		best_node = self.node_list[cost_list.index(min(cost_list))]
+				gain_list.append(float("-inf"))
+		best_node = self.node_list[gain_list.index(max(gain_list))]
 		return best_node
 
 	def get_path(self, last_node):
@@ -136,8 +136,9 @@ class PRM_star_Dubins:
 	def rewire(self, new_node, near_nodes):
 		for near_node in near_nodes:
 			temp_node = self.steer(new_node, near_node)
-			if near_node.cost * near_node.dist > temp_node.cost * temp_node.dist and self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
-				near_node.__dict__.update(vars(temp_node))
+			if near_node.dist != 0:
+				if near_node.gain / near_node.dist < temp_node.gain / temp_node.dist and self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
+					near_node.__dict__.update(vars(temp_node))
 
 	def check_collision(self, node):
 		if self.obstacles is not None:
@@ -154,35 +155,16 @@ class PRM_star_Dubins:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, px, py, pangle, plength):
-		control_cost = 0  # NOT USED!!!!!!
-		var_cost = np.zeros(len(px))
-
-		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
-		A = np.zeros(shape=(n + p, 1)).astype(float)
-		# iterate over path and calculate cost
-		for kk in range(len(px)):  # Iterate over length of trajectory
-			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
-				var_cost[kk] = Config.border_variance_penalty
-				control_cost += 0
-			else:
-				p1 = time.time()
-				A_z = interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
-				var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
-				control_cost += 0
-				self.method_time += (time.time() - p1)
-		return np.sum(var_cost)
-
 	def reward(self, px, py, pangle):
 		control_cost = 0  # NOT USED!!!!!!
 		var_reward = np.zeros(len(px))
 
 		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
 		A = np.zeros(shape=(n + p, 1)).astype(float)
-		# iterate over path and calculate cost
+		# iterate over path and calculate reward
 		for kk in range(len(px)):  # Iterate over length of trajectory
 			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
-				var_reward[kk] = -2    # Config.border_variance_penalty
+				var_reward[kk] = -2  # Config.border_variance_penalty
 				control_cost += 0
 			else:
 				p1 = time.time()
@@ -192,7 +174,7 @@ class PRM_star_Dubins:
 				# A = A + Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)  # for first summing then dotting
 				self.method_time += (time.time() - p1)
 		return np.sum(var_reward)
-	
+
 	def draw_graph(self, plot=None):
 		if plot is None:  # use built in plt
 			for node in self.node_list:
@@ -207,7 +189,7 @@ class PRM_star_Dubins:
 			plt.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
 			plt.axis(self.space)
 			plt.grid(True)
-			plt.title("PRM* (distance cost function)")
+			plt.title("PRM* (variance reward function)")
 			plt.pause(.1)  # need for animation
 
 		else:  # use plot of calling
@@ -223,7 +205,7 @@ class PRM_star_Dubins:
 			plot.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
 			plot.axis(self.space)
 			plot.grid(True)
-			plot.title("PRM* (distance cost function)")
+			plot.title("PRM* (variance reward function)")
 			plot.pause(.1)  # need for animation
 
 
@@ -231,7 +213,7 @@ def dist(node1, node2):
 	# returns distance between two nodes
 	return math.sqrt((node2.pose[0] - node1.pose[0]) ** 2 +
 					 (node2.pose[1] - node1.pose[1]) ** 2 +
-					 3 * min((node1.pose[2] - node2.pose[2]) ** 2, (node1.pose[2] - node2.pose[2] + 2*math.pi) ** 2, (node1.pose[2] - node2.pose[2] - 2*math.pi) ** 2))
+					 3 * min((node1.pose[2] - node2.pose[2]) ** 2, (node1.pose[2] - node2.pose[2] + 2 * math.pi) ** 2, (node1.pose[2] - node2.pose[2] - 2 * math.pi) ** 2))
 
 
 # Calculate new observation vector through shape function interpolation
