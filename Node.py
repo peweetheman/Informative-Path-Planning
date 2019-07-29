@@ -5,6 +5,7 @@ class Node(object):
 		self.parent = None
 		self.cost = 0.0
 		self.gain = 0.0
+		self.total_var = 0.0
 		self.dist = 0.0
 		self.pose = np.array(pose)           # x-coordinate, y-coordinate, angle-coordinate (in radians) constitutes a pose
 		self.u = []                # list of controls required to get from parent node to this node

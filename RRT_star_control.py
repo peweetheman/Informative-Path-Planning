@@ -94,7 +94,7 @@ class RRT_star:
 		mincost = min(cost_list)
 		min_node = near_nodes[cost_list.index(mincost)]
 		if mincost == float("inf"):
-			print("no parent found (in set)")
+			print("no parent found (in set parent)")
 			return
 		new_node.cost = mincost
 		new_node.parent = min_node

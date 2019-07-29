@@ -74,6 +74,7 @@ class PRM_star_Dubins:
 		new_node.path_angle = pangle
 		new_node.u = u
 		new_node.dist += plength
+		new_node.total_var += self.path_var(px, py, pangle)
 		new_node.cost += self.cost(px, py, pangle, plength)
 		new_node.parent = source_node
 		return new_node
@@ -86,7 +87,7 @@ class PRM_star_Dubins:
 		for near_node in near_nodes:
 			temp_node = self.steer(near_node, sample_node)
 			if self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
-				cost_list.append(temp_node.cost * temp_node.dist)
+				cost_list.append(temp_node.total_var / temp_node.dist)
 			else:
 				cost_list.append(float("inf"))
 
@@ -103,7 +104,7 @@ class PRM_star_Dubins:
 		cost_list = []
 		for node in self.node_list:
 			if node.dist >= self.min_dist:
-				cost_list.append(node.cost * node.dist)
+				cost_list.append(node.total_var / node.dist)
 			else:
 				cost_list.append(float("inf"))
 		best_node = self.node_list[cost_list.index(min(cost_list))]
@@ -136,7 +137,7 @@ class PRM_star_Dubins:
 	def rewire(self, new_node, near_nodes):
 		for near_node in near_nodes:
 			temp_node = self.steer(new_node, near_node)
-			if near_node.cost * near_node.dist > temp_node.cost * temp_node.dist and self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
+			if near_node.total_var / near_node.dist > temp_node.total_var / temp_node.dist and self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
 				near_node.__dict__.update(vars(temp_node))
 
 	def check_collision(self, node):
@@ -163,7 +164,7 @@ class PRM_star_Dubins:
 		# iterate over path and calculate cost
 		for kk in range(len(px)):  # Iterate over length of trajectory
 			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
-				var_cost[kk] = Config.border_variance_penalty
+				var_cost[kk] = Config.border_variance_penalty  # value of 5
 				control_cost += 0
 			else:
 				p1 = time.time()
@@ -171,28 +172,29 @@ class PRM_star_Dubins:
 				var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
 				control_cost += 0
 				self.method_time += (time.time() - p1)
-		return np.sum(var_cost)
+		return np.sum(var_cost) * plength
 
-	def reward(self, px, py, pangle):
+	def path_var(self, px, py, pangle):       # returns total variance along the path
 		control_cost = 0  # NOT USED!!!!!!
-		var_reward = np.zeros(len(px))
+		var_cost = np.zeros(len(px))
 
 		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
 		A = np.zeros(shape=(n + p, 1)).astype(float)
 		# iterate over path and calculate cost
 		for kk in range(len(px)):  # Iterate over length of trajectory
 			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
-				var_reward[kk] = -2    # Config.border_variance_penalty
+				var_cost[kk] = Config.border_variance_penalty  # value of 5
 				control_cost += 0
 			else:
 				p1 = time.time()
-				A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
-				var_reward[kk] = (np.dot(A_z.T, self.var_x)[0][0])
+
+				A_z = interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
+				var_cost[kk] = - (np.dot(A_z.T, self.var_x)[0][0])
 				control_cost += 0
-				# A = A + Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)  # for first summing then dotting
+
 				self.method_time += (time.time() - p1)
-		return np.sum(var_reward)
-	
+		return np.sum(var_cost)
+
 	def draw_graph(self, plot=None):
 		if plot is None:  # use built in plt
 			for node in self.node_list:
