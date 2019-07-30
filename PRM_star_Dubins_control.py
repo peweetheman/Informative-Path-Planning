@@ -73,9 +73,11 @@ class PRM_star_Dubins:
 		new_node.path_y = py
 		new_node.path_angle = pangle
 		new_node.u = u
+
+		new_node.path_dist = plength
 		new_node.dist += plength
-		new_node.total_var += self.path_var(px, py, pangle)
-		new_node.cost += self.cost(px, py, pangle, plength)
+		new_node.path_var = self.path_var(px, py, pangle)
+		new_node.total_var += new_node.path_var
 		new_node.parent = source_node
 		return new_node
 
@@ -137,8 +139,28 @@ class PRM_star_Dubins:
 	def rewire(self, new_node, near_nodes):
 		for near_node in near_nodes:
 			temp_node = self.steer(new_node, near_node)
-			if near_node.total_var / near_node.dist > temp_node.total_var / temp_node.dist and self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
-				near_node.__dict__.update(vars(temp_node))
+			if near_node.dist != 0:
+				if near_node.total_var / near_node.dist > temp_node.total_var / temp_node.dist and self.check_collision(temp_node) \
+						and self.max_dist >= temp_node.dist and self.check_loop(near_node, new_node):
+					near_node.__dict__.update(vars(temp_node))
+					self.propagate_update_to_children(near_node)
+
+	def propagate_update_to_children(self, parent_node):
+		for node in self.node_list:
+			if node.parent is not None:
+				if node.parent == parent_node:
+					node.total_var = parent_node.total_var + node.path_var
+					node.dist = parent_node.dist + node.path_dist
+					self.propagate_update_to_children(node)
+
+	def check_loop(self, near_node, new_node):
+		# checks to make sure that changing parents to temp_node does not create a loop
+		temp = new_node.parent
+		while temp is not None:
+			if temp == near_node:
+				return False       # creates a loop
+			temp = temp.parent
+		return True                # does not create a loop
 
 	def check_collision(self, node):
 		if self.obstacles is not None:
@@ -155,66 +177,47 @@ class PRM_star_Dubins:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, px, py, pangle, plength):
+	# def cost(self, px, py, pangle, plength):
+	# 	control_cost = 0  # NOT USED!!!!!!
+	# 	var_cost = np.zeros(len(px))
+	# 	(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
+	# 	A = np.zeros(shape=(n + p, 1)).astype(float)
+	# 	# iterate over path and calculate cost
+	# 	for kk in range(len(px)):  # Iterate over length of trajectory
+	# 		if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
+	# 			var_cost[kk] = Config.border_variance_penalty  # value of 5
+	# 			control_cost += 0
+	# 		else:
+	# 			p1 = time.time()
+	# 			A_z = interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
+	# 			var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
+	# 			control_cost += 0
+	# 			self.method_time += (time.time() - p1)
+	# 	return np.sum(var_cost)
+
+	def path_var(self, px, py, pangle):       # returns negative total variance along the path
 		control_cost = 0  # NOT USED!!!!!!
-		var_cost = np.zeros(len(px))
+		path_var = 0
 
 		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
+		p1 = time.time()
 		A = np.zeros(shape=(n + p, 1)).astype(float)
 		# iterate over path and calculate cost
 		for kk in range(len(px)):  # Iterate over length of trajectory
 			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
-				var_cost[kk] = Config.border_variance_penalty  # value of 5
+				path_var += Config.border_variance_penalty  # value of 5
 				control_cost += 0
 			else:
-				p1 = time.time()
-				A_z = interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
-				var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
+				A += interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
 				control_cost += 0
-				self.method_time += (time.time() - p1)
-		return np.sum(var_cost) * plength
-
-	def path_var(self, px, py, pangle):       # returns total variance along the path
-		control_cost = 0  # NOT USED!!!!!!
-		var_cost = np.zeros(len(px))
-
-		(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
-		A = np.zeros(shape=(n + p, 1)).astype(float)
-		# iterate over path and calculate cost
-		for kk in range(len(px)):  # Iterate over length of trajectory
-			if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
-				var_cost[kk] = Config.border_variance_penalty  # value of 5
-				control_cost += 0
-			else:
-				p1 = time.time()
-
-				A_z = interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
-				var_cost[kk] = - (np.dot(A_z.T, self.var_x)[0][0])
-				control_cost += 0
-
-				self.method_time += (time.time() - p1)
-		return np.sum(var_cost)
+		path_var -= np.dot(A.T, self.var_x)[0][0]
+		self.method_time += (time.time() - p1)
+		return path_var    # negative path var
 
 	def draw_graph(self, plot=None):
-		if plot is None:  # use built in plt
+		if plot is not None:  # use plot of calling
 			for node in self.node_list:
-				plt.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]))
-				if node.parent is not None:
-					plt.plot(node.path_x, node.path_y, 'yH', markersize=2)
-
-			if self.obstacles is not None:
-				for (x, y, side) in self.obstacles:
-					plt.plot(x, y, "sk", ms=8 * side)
-
-			plt.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
-			plt.axis(self.space)
-			plt.grid(True)
-			plt.title("PRM* (distance cost function)")
-			plt.pause(.1)  # need for animation
-
-		else:  # use plot of calling
-			for node in self.node_list:
-				plot.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]))
+				plot.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]), color="y")
 				if node.parent is not None:
 					plot.plot(node.path_x, node.path_y, 'yH', markersize=2)
 
@@ -225,7 +228,7 @@ class PRM_star_Dubins:
 			plot.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
 			plot.axis(self.space)
 			plot.grid(True)
-			plot.title("PRM* (distance cost function)")
+			plot.title("PRM* (avg variance per path length as cost function)")
 			plot.pause(.1)  # need for animation
 
 
@@ -253,31 +256,3 @@ def interpolation_matrix(x_local2, n, p, lx, xg_min, yg_min, de):
 	u1[((ny + 1) * lx) + nx] = (-1 / (de[0] * de[1])) * ((x_el - de[0] / 2) * (y_el + de[1] / 2))  # u for upper left corner
 	u1[((ny + 1) * lx) + nx + 1] = (1 / (de[0] * de[1])) * ((x_el + de[0] / 2) * (y_el + de[1] / 2))  # u for upper right corner
 	return u1
-
-
-def main():
-	start_time = time.time()
-	# squares of [x,y,side length]
-	obstacles = [
-		(15, 17, 7),
-		(4, 10, 6),
-		(7, 23, 9),
-		(22, 12, 5),
-		(9, 15, 4)]
-
-	# calling PRM*
-	PRM_star = PRM_star_Dubins(start=[15.0, 28.0, np.deg2rad(0.0)], space=[0, 30, 0, 30], obstacles=obstacles)
-	path, u_optimal, tau_optimal = PRM_star.control_algorithm()
-	print(u_optimal)
-
-	# plotting code
-	PRM_star.draw_graph()
-	if path[-1] is not None:
-		plt.plot([node.pose[0] for node in path], [node.pose[1] for node in path], '-r')
-	plt.grid(True)
-	print("--- %s seconds ---" % (time.time() - start_time))
-	plt.show()
-
-
-if __name__ == '__main__':
-	main()

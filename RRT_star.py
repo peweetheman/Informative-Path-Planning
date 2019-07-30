@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class RRT_star:
 	# Basic RRT* algorithm using distance as dist function
 
-	def __init__(self, start, goal, space, obstacles, growth=4.0, max_iter=100, max_dist=40, max_curvature=1.0, end_sample_percent=15):
+	def __init__(self, start, goal, space, obstacles, growth=4.0, max_iter=30, max_dist=40, max_curvature=.8, end_sample_percent=15):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location

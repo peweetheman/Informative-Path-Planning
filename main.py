@@ -11,8 +11,9 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 import Config
 import gp_scripts
 import control_scripts
+from RRT_control import RRT
 from RRT_star_control import RRT_star
-from PRM_star_Dubins_control_reward import PRM_star_Dubins
+from PRM_star_Dubins_control import PRM_star_Dubins
 import plot_scripts
 from true_field import true_field
 import time
@@ -20,7 +21,7 @@ from scipy import sqrt
 from scipy.interpolate import griddata
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-for iter in range(1):
+for iter in range(100):
 	# AUV starting state
 	x_auv = Config.x_auv
 
@@ -72,10 +73,10 @@ for iter in range(1):
 		# u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
 		# RRT_star1 = None
 
-		PRM_star = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1)
-		path_optimal, u_optimal, tau_optimal, dubins_time, method_time = PRM_star.control_algorithm()
+		PRM_star1 = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1)
+		path_optimal, u_optimal, tau_optimal, dubins_time, method_time = PRM_star1.control_algorithm()
 		print("dubins planner time: ", dubins_time)
-		print("time in shape function method: ", method_time)
+		print("time in cost function method: ", method_time)
 		x_auv = tau_optimal[:, 2]
 		tau_x = None
 
@@ -87,7 +88,7 @@ for iter in range(1):
 		# tau_x = None
 
 		# RRT1 = RRT(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1)
-		# path_optimal, u_optimal, tau_optimal, dubins_time, method_time = RRT_star1.control_algorithm()
+		# path_optimal, u_optimal, tau_optimal, dubins_time, method_time = RRT1.control_algorithm()
 		# print("dubins planner time: ", dubins_time)
 		# print("interpolation matrix time: ", method_time)
 		# x_auv = tau_optimal[:, 2]
@@ -98,7 +99,7 @@ for iter in range(1):
 		print("Calc. time control script: /", "{0:.2f}".format(time_5 - time_4))
 
 		# Plot new GMRF belief and optimal control path
-		plot_scripts.update_animation1(PRM_star, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
+		plot_scripts.update_animation1(PRM_star1, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
 		time_6 = time.time()
 		print("Calc. time Plot: /", "{0:.2f}".format(time_6 - time_5))
 
@@ -108,6 +109,7 @@ for iter in range(1):
 			path_length += ((trajectory_1[kk, 0] - trajectory_1[kk-1, 0]) ** 2 + (trajectory_1[kk, 1] - trajectory_1[kk-1, 1]) ** 2)
 		# print("path length: ", path_length)
 		if path_length >= max_path_length:
+			print("END DUE TO MAX PATH LENGTH")
 			break
 
 		# CODE FOR BENCHMARKING
@@ -132,4 +134,4 @@ for iter in range(1):
 		# write to file
 		col = np.vstack((path_length, total_variance_sum, field_variance_sum, mean_RMSE, control_calc_time))
 		data = np.concatenate((data, col), axis=1)
-	np.savetxt(filename, data)
+	np.save(filename, data)
