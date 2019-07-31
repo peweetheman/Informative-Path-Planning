@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 class PRM_star_Dubins:
 	# PRM* algorithm using distance as dist function
 
-	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, max_iter=30, max_dist=25, min_dist=3, max_curvature=1.0):
+	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, max_iter=30, max_dist=25, min_dist=3, max_curvature=1.0, plot=None):
 		"""
 		:param start: [x,y] starting location
 		:param space: [min,max] bounds on square space
@@ -34,6 +34,7 @@ class PRM_star_Dubins:
 		self.max_curvature = max_curvature
 		self.local_planner_time = 0.0
 		self.method_time = 0.0
+		self.plot = plot
 
 	def control_algorithm(self):
 		for i in range(self.max_iter):
@@ -47,7 +48,7 @@ class PRM_star_Dubins:
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
 			# animate added edges
-			# self.draw_graph()
+			# self.draw_graph(self.plot)
 
 		# generate path
 		last_node = self.get_best_last_node()
@@ -217,9 +218,9 @@ class PRM_star_Dubins:
 	def draw_graph(self, plot=None):
 		if plot is not None:  # use plot of calling
 			for node in self.node_list:
-				plot.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]), color="y")
+				plot.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]), color='b', angles='xy', scale_units='xy', scale=.8, width=.015)
 				if node.parent is not None:
-					plot.plot(node.path_x, node.path_y, 'yH', markersize=2)
+					plot.plot(node.path_x, node.path_y, color='green')
 
 			if self.obstacles is not None:
 				for (x, y, side) in self.obstacles:
@@ -231,16 +232,14 @@ class PRM_star_Dubins:
 			plot.title("PRM* (avg variance per path length as cost function)")
 			plot.pause(.1)  # need for animation
 
-
 def dist(node1, node2):
 	# returns distance between two nodes
 	return math.sqrt((node2.pose[0] - node1.pose[0]) ** 2 +
 					 (node2.pose[1] - node1.pose[1]) ** 2 +
 					 3 * min((node1.pose[2] - node2.pose[2]) ** 2, (node1.pose[2] - node2.pose[2] + 2*math.pi) ** 2, (node1.pose[2] - node2.pose[2] - 2*math.pi) ** 2))
 
-
-# Calculate new observation vector through shape function interpolation
 def interpolation_matrix(x_local2, n, p, lx, xg_min, yg_min, de):
+	# Calculate new observation vector through shape function interpolation
 	"""INTERPOLATION MATRIX:
 	Define shape function matrix that maps grid vertices to
 	continuous measurement locations"""

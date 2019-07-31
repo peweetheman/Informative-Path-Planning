@@ -48,13 +48,15 @@ for iter in range(100):
 	"""#####################################################################################"""
 	"""START SIMULATION"""
 	total_calc_time_control_script = 0
-	filename = 'PI_data' + str(iter) + '.txt'
+	filename = 'PI_data' + str(iter)
 	data = np.zeros(shape=(5, 1))
-	max_path_length = 20
+	max_path_length = Config.simulation_max_dist
 	path_length = 0
-	while True:   # for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
-		# if time_in_ms % Config.sample_time_gmrf < 0.0000001:
-			# Calculate next AUV state
+	myplot=None
+	while True:
+	# for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
+	# 	if time_in_ms % Config.sample_time_gmrf < 0.0000001:
+				# Calculate next AUV state
 		# x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, field_limits)
 		trajectory_1 = np.vstack([trajectory_1, x_auv])
 
@@ -68,29 +70,29 @@ for iter in range(100):
 		time_4 = time.time()
 		# print("Calc. time GMRF: /", "{0:.2f}".format(time_4 - time_3))
 
-		# Calculate optimal control path
+		# Calculate optimal control path with one of the following control scripts. Comment and uncomment regions apropriately for usage.
 
 		# u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, field_limits, Config.set_sanity_check)
 		# RRT_star1 = None
 
-		PRM_star1 = PRM_star_Dubins(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1)
+		PRM_star1 = PRM_star_Dubins(start=x_auv, space=Config.field_dim, obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1, plot=myplot)
 		path_optimal, u_optimal, tau_optimal, dubins_time, method_time = PRM_star1.control_algorithm()
 		print("dubins planner time: ", dubins_time)
-		print("time in cost function method: ", method_time)
-		x_auv = tau_optimal[:, 2]
+		print("cost function time: ", method_time)
+		x_auv = tau_optimal[:, 3]
 		tau_x = None
 
-		# RRT_star1 = RRT_star(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1)
+		# RRT_star1 = RRT_star(start=x_auv, space=Config.field_dim, obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1, plot=myplot)
 		# path_optimal, u_optimal, tau_optimal, dubins_time, method_time = RRT_star1.control_algorithm()
 		# print("dubins planner time: ", dubins_time)
-		# print("interpolation matrix time: ", method_time)
-		# x_auv = tau_optimal[:, 2]
+		# print("cost function time: ", method_time)
+		# x_auv = tau_optimal[:, 4]
 		# tau_x = None
 
-		# RRT1 = RRT(start=x_auv, space=[0, 10, 0, 5], obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1)
+		# RRT1 = RRT(start=x_auv, space=Config.field_dim, obstacles=None, var_x=var_x, gmrf_params=gmrf1.params, max_dist=max_path_length-path_length-1)
 		# path_optimal, u_optimal, tau_optimal, dubins_time, method_time = RRT1.control_algorithm()
 		# print("dubins planner time: ", dubins_time)
-		# print("interpolation matrix time: ", method_time)
+		# print("cost function time: ", method_time)
 		# x_auv = tau_optimal[:, 2]
 		# tau_x = None
 
@@ -99,9 +101,9 @@ for iter in range(100):
 		print("Calc. time control script: /", "{0:.2f}".format(time_5 - time_4))
 
 		# Plot new GMRF belief and optimal control path
-		plot_scripts.update_animation1(PRM_star1, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
-		time_6 = time.time()
-		print("Calc. time Plot: /", "{0:.2f}".format(time_6 - time_5))
+		# traj, myplot = plot_scripts.update_animation1(PRM_star1, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
+		# time_6 = time.time()
+		# print("Calc. time Plot: /", "{0:.2f}".format(time_6 - time_5))
 
 		# calculate trajectory length and terminate after trajectory length exceeds bound
 		path_length = 0

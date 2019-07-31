@@ -160,9 +160,8 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 			time1 = time.time()
 			sampling_control.draw_graph(plot=plt)
 			print("calc time sampling algo plotting: ", time.time() - time1)
-
-		plt.quiver(x_auv[0], x_auv[1], np.cos(x_auv[2]), np.sin(x_auv[2]), width=.005)
 		plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
+		plt.quiver(x_auv[0], x_auv[1], np.cos(x_auv[2]), np.sin(x_auv[2]), width=.005)
 
 		if tau_x is not None:
 			for jj in range(0, Config.n_k):  # Iterate over all trajectories
@@ -176,4 +175,4 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 	fig1.canvas.draw_idle()
 	plt.pause(0.05)
 	plt.clf()
-	return trajectory_1
+	return trajectory_1, plt

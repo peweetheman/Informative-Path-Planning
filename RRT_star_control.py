@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 class RRT_star:
 	# Basic RRT* algorithm using distance as cost function
 
-	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, growth=4.0, max_iter=50, max_dist=40, min_dist=3, max_curvature=.8):
+	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, growth=1.5, max_iter=50, max_dist=40, min_dist=3, max_curvature=.8, plot=None):
 		"""
 		:param start: [x,y] starting location
 		:param space: [min,max] bounds on square space
@@ -34,6 +34,7 @@ class RRT_star:
 		self.max_curvature = max_curvature
 		self.local_planner_time = 0.0
 		self.method_time = 0.0
+		self.plot = plot
 
 	def control_algorithm(self):
 		for i in range(self.max_iter):
@@ -50,7 +51,7 @@ class RRT_star:
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
 		# draw added edges
-			# self.draw_graph()
+			#self.draw_graph(self.plot)
 		# generate path
 		last_node = self.get_best_last_node()
 		path, u_optimal, tau_optimal = self.get_path(last_node)
@@ -91,7 +92,6 @@ class RRT_star:
 		if mincost == float("inf"):
 			print("no parent found (in set)")
 			return
-
 		new_node.parent = min_node
 		# CALL TO LOCAL PATH PLANNER
 		px, py, pangle, mode, plength, u = plan.dubins_path_planning(min_node.pose[0], min_node.pose[1], min_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
@@ -138,7 +138,7 @@ class RRT_star:
 	def rewire(self, new_node, near_nodes):
 		for near_node in near_nodes:
 			p1 = time.time()
-			px, py, pangle, mode, plength, u = plan.dubins_path_planning(near_node.pose[0], near_node.pose[1], near_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+			px, py, pangle, mode, plength, u = plan.dubins_path_planning(new_node.pose[0], new_node.pose[1], new_node.pose[2], near_node.pose[0], near_node.pose[1], near_node.pose[2], self.max_curvature)
 			p2 = time.time()
 			self.local_planner_time += (p2 - p1)
 			avg_var_per_length = (new_node.total_var + self.path_var(px, py, pangle)) / (new_node.dist + plength)
@@ -171,7 +171,6 @@ class RRT_star:
 				return False       # creates a loop
 			temp = temp.parent
 		return True                # does not create a loop
-
 
 	def check_collision_path(self, px, py):
 		# check for collision on path
@@ -235,10 +234,9 @@ class RRT_star:
 	def draw_graph(self, plot=None):
 		if plot is not None:  # use plot of calling
 			for node in self.node_list:
-				plot.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]), color='m')
+				plot.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]), color='b', angles='xy', scale_units='xy', scale=.8, width=.015)
 				if node.parent is not None:
-					for (x, y) in zip(node.path_x, node.path_y):
-						plt.plot(x, y, "yH", markersize=2)
+					plot.plot(node.path_x, node.path_y, color='green')
 
 			if self.obstacles is not None:
 				for (x, y, side) in self.obstacles:
