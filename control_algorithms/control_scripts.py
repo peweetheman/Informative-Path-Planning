@@ -1,6 +1,5 @@
 """
 Control scripts.
-
 author: Andreas Rene Geist
 email: andreas.geist@tuhh.de
 website: https://github.com/AndReGeist
@@ -14,7 +13,7 @@ from random import randint
 import time
 
 
-def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_limits, set_sanity_check):
+def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_dim, set_sanity_check):
 	"""Optimal Stochastic controller in PI formulation, based on Schaal et al.
 	"A generalized Path Integral Control Approach for Reinforcement Learning" (2010) """
 	(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = gmrf_params
@@ -43,7 +42,7 @@ def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_lim
 
 			for kk in range(0, N_horizon - 1):  # Iterate over length of trajectory except of last entry
 				# Sample roll-out trajectory
-				tau_x[:, kk + 1, jj] = Config.auv_dynamics(tau_x[:, kk, jj], u_optimal[kk], epsilon_auv[kk, jj], t_cstep, field_limits, set_border=False)
+				tau_x[:, kk + 1, jj] = Config.auv_dynamics(tau_x[:, kk, jj], u_optimal[kk], epsilon_auv[kk, jj], t_cstep, field_dim, set_border=False)
 
 			"""Calculate cost and probability weighting"""
 			for kk in range(0, N_horizon):  # Iterate over length of trajectory
@@ -51,7 +50,7 @@ def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_lim
 				M_m = 1  # Only for p=1 and this simple state model !
 				# if M_m == 1:
 				#   print('Tau', tau_x[0:2, kk, jj], 'FL', field_limits)
-				if not (0 <= tau_x[0, kk, jj] <= field_limits[0]) or not (0 <= tau_x[1, kk, jj] <= field_limits[1]):
+				if not (0 <= tau_x[0, kk, jj] <= field_dim[1]) or not (0 <= tau_x[1, kk, jj] <= field_dim[3]):
 					# print('Tau', tau_x[0:2, kk, jj], 'FL', field_limits)
 					pre_x_tau[kk, jj] = Config.border_variance_penalty
 					control_cost[kk, jj] = 0
@@ -84,7 +83,7 @@ def pi_controller(x_auv, u_optimal, var_x, pi_parameters, gmrf_params, field_lim
 		var_x_test = np.zeros(shape=(N_horizon, 1))
 		control_cost_test = np.zeros(shape=(N_horizon, 1))
 		for kk in range(0, N_horizon - 1):  # Iterate over length of trajectory except of last entry
-			tau_optimal[:, kk + 1] = Config.auv_dynamics(tau_optimal[:, kk], u_optimal[kk], 0, t_cstep, field_limits)
+			tau_optimal[:, kk + 1] = Config.auv_dynamics(tau_optimal[:, kk], u_optimal[kk], 0, t_cstep, field_dim)
 
 		for kk in range(0, N_horizon):  # Iterate over length of trajectory except of last entry
 			A_test = Config.interpolation_matrix(tau_optimal[:, kk], n, p, lx, xg_min, yg_min, de)

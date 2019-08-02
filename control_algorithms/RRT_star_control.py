@@ -1,61 +1,64 @@
-from Node import Node
-import dubins_path_planner as plan
-import Config
-from scipy.interpolate import interp1d
-from true_field import true_field
-import random
 import math
-import copy
-import numpy as np
+import random
 import time
-import matplotlib.pyplot as plt
+
+import numpy as np
+
+import Config
+from control_algorithms.Node import Node
+from control_algorithms.local_planners import dubins_path_planner as plan
 
 
-class PRM_star_Dubins:
-	# PRM* algorithm using distance as dist function
+class RRT_star:
+	# Basic RRT* algorithm using distance as cost function
 
-	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, max_iter=30, max_dist=25, min_dist=3, max_curvature=1.0, plot=None):
+	def __init__(self, start, RRT_params, gmrf_params, var_x, max_dist, plot, min_dist=3):
 		"""
-		:param start: [x,y] starting location
-		:param space: [min,max] bounds on square space
-		:param obstacles: list of square obstacles
-		:param growth: size of growth each new sample
-		:param max_iter: max number of iterations for algorithm
+		:param start: initial location of agent
+		:param RRT_params: specified in config file
+		:param gmrf_params: specified in config file
+		:param var_x: variance of field as a 1D vector of variance of each node in GMRF
+		:param max_dist: maximum distance that the algorithm solution will return
+		:param min_dist: minimum distance that the algorithm solution will return
+		:param plot: only used for plotting in the middle of running algorithm good for debugging
 		"""
 		self.start = Node(start)
 		self.node_list = [self.start]
-		self.space = space
-		self.max_iter = max_iter
 		self.max_dist = max_dist
 		self.min_dist = min_dist
-		self.obstacles = obstacles
 		self.var_x = var_x
 		self.gmrf_params = gmrf_params
-		self.max_curvature = max_curvature
+		(self.space, self.max_time, self.max_curvature, self.growth, self.obstacles) = RRT_params
 		self.local_planner_time = 0.0
 		self.method_time = 0.0
 		self.plot = plot
 
 	def control_algorithm(self):
-		for i in range(self.max_iter):
-			sample_node = self.get_sample()
+		start_time = time.time()
+		while True:
+			current_time = time.time() - start_time
+			if current_time > self.max_time:
+				break
 
-			if self.check_collision(sample_node):
-				near_nodes = self.get_near_nodes(sample_node)
-				new_node = self.set_parent(sample_node, near_nodes)
-				if new_node is None:  # no possible path from any of the near nodes
+			sample = self.get_sample()
+			nearest_node = self.nearest_node(sample)
+			new_node = self.steer(nearest_node, sample)
+
+			if self.check_collision(new_node.pose[0], new_node.pose[1]):
+				near_nodes = self.get_near_nodes(new_node)
+				self.set_parent(new_node, near_nodes)
+				if new_node.parent is None:    # no possible path from any of the near nodes
+					print("new_node.parent is none (printed in main algo)")
 					continue
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
-			# animate added edges
-			# self.draw_graph(self.plot)
-
+		# draw added edges
+			#self.draw_graph(self.plot)
 		# generate path
 		last_node = self.get_best_last_node()
-		if last_node is None:
-			return None
 		path, u_optimal, tau_optimal = self.get_path(last_node)
-		return path, u_optimal, tau_optimal, self.local_planner_time, self.method_time
+
+		return path, u_optimal, tau_optimal
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
@@ -63,51 +66,58 @@ class PRM_star_Dubins:
 					  random.uniform(-math.pi, math.pi)])
 		return sample
 
-	def steer(self, source_node, destination_node):
-		# take source_node and find path to destination_node
-		time1 = time.time()
-		px, py, pangle, mode, plength, u = plan.dubins_path_planning(source_node.pose[0], source_node.pose[1], source_node.pose[2], destination_node.pose[0], destination_node.pose[1], destination_node.pose[2], self.max_curvature)
-		self.local_planner_time += time.time() - time1
-		new_node = copy.deepcopy(source_node)
-		new_node.pose = destination_node.pose
-		new_node.path_x = px
-		new_node.path_y = py
-		new_node.path_angle = pangle
-		new_node.u = u
+	def steer(self, source_node, dest_node):
+		# take source_node and steer towards destination node
+		dtheta = random.uniform(-self.max_curvature/2, self.max_curvature/2)
+		dx = np.cos(source_node.pose[2] + dtheta/2)
+		dy = np.sin(source_node.pose[2] + dtheta/2)
+		vec = np.array([dx, dy, dtheta])
+		new_node = Node(source_node.pose + self.growth * vec)
 
-		new_node.path_dist = plength
-		new_node.dist += plength
-		new_node.path_var = self.path_var(px, py, pangle)
-		new_node.total_var += new_node.path_var
-		new_node.parent = source_node
+		if new_node.pose[0] < self.space[0]:
+			new_node.pose[0] = self.space[0] - random.uniform(0, 1)
+		if new_node.pose[0] > self.space[1]:
+			new_node.pose[0] = self.space[1] - random.uniform(0, 1)
+		if new_node.pose[1] < self.space[2]:
+			new_node.pose[1] = self.space[2] - random.uniform(0, 1)
+		if new_node.pose[1] > self.space[3]:
+			new_node.pose[1] = self.space[3] - random.uniform(0, 1)
 		return new_node
 
-	def set_parent(self, sample_node, near_nodes):
+	def set_parent(self, new_node, near_nodes):
 		# connects new_node along a minimum cost path
 		if not near_nodes:
-			near_nodes.append(self.nearest_node(sample_node))
+			near_nodes.append(self.nearest_node(new_node))
 		cost_list = []
 		for near_node in near_nodes:
-			temp_node = self.steer(near_node, sample_node)
-			if self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
-				cost_list.append(temp_node.total_var / temp_node.dist)
+			# CALL TO LOCAL PATH PLANNER
+			px, py, pangle, mode, plength, u = plan.dubins_path_planning(near_node.pose[0], near_node.pose[1], near_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+			path_var = self.path_var(px, py, pangle)
+			if self.check_collision_path(px, py) and self.max_dist >= plength + near_node.dist:
+				cost_list.append((near_node.total_var + path_var) / (near_node.dist + plength))
 			else:
 				cost_list.append(float("inf"))
 
-		min_cost = min(cost_list)
-		min_node = near_nodes[cost_list.index(min_cost)]
-
-		new_node = self.steer(min_node, sample_node)
-		if new_node.cost == float("inf"):
-			print("min cost is inf")
-			return None
-		return new_node
+		mincost = min(cost_list)
+		min_node = near_nodes[cost_list.index(mincost)]
+		if mincost == float("inf"):
+			print("no parent found (in set)")
+			return
+		new_node.parent = min_node
+		# CALL TO LOCAL PATH PLANNER
+		px, py, pangle, mode, plength, u = plan.dubins_path_planning(min_node.pose[0], min_node.pose[1], min_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+		new_node.path_x = px
+		new_node.path_y = py
+		new_node.path_angle = pangle
+		new_node.total_var = new_node.parent.total_var + self.path_var(px, py, pangle)
+		new_node.u = u
+		new_node.dist = new_node.parent.dist + plength
 
 	def get_best_last_node(self):
 		cost_list = []
 		for node in self.node_list:
 			if node.dist >= self.min_dist:
-				cost_list.append(node.total_var / node.dist)
+				cost_list.append(node.total_var/node.dist)
 			else:
 				cost_list.append(float("inf"))
 		best_node = self.node_list[cost_list.index(min(cost_list))]
@@ -115,36 +125,46 @@ class PRM_star_Dubins:
 
 	def get_path(self, last_node):
 		path = [last_node]
-		u_optimal = []
+		u_optimal = np.array((last_node.u))
 		tau_optimal = np.vstack((last_node.path_x, last_node.path_y, last_node.path_angle))
 		while True:
-			path.append(last_node.parent)
-			u_optimal = u_optimal + last_node.u
 			last_node = last_node.parent
 			if last_node is None:
 				break
+			u_optimal = np.concatenate((u_optimal, last_node.u), axis=0)
 			tau_add = np.vstack((last_node.path_x, last_node.path_y, last_node.path_angle))
 			tau_optimal = np.concatenate((tau_add, tau_optimal), axis=1)
+			path.append(last_node)
 		return path, u_optimal, tau_optimal
 
 	def get_near_nodes(self, new_node):
-		# gamma_star = 2(1+1/d) ** (1/d) volume(free)/volume(total) ** 1/d and we need gamma > gamma_star
-		# for asymptotical completeness see Kalman 2011. gamma = 1 satisfies
+		# gamma_star = 2(1+1/d) ** (1/d) volume(free)/volume(total) ** 1/d. We need a gamma > gamma_star for asymptotical completeness. See Kalman 2011. gamma = 1 satisfies
 		d = 2  # dimension of the self.space
 		nnode = len(self.node_list)
-		r = min(20.0 * ((math.log(nnode) / nnode)) ** (1 / d), 5.0)
-		dlist = [dist(new_node, node) for node in self.node_list]
+		r = min(20.0 * ((math.log(nnode) / nnode)) ** (1 / d), self.growth * 5.0)
+		dlist = [dist(node, new_node) for node in self.node_list]
 		near_nodes = [self.node_list[dlist.index(d)] for d in dlist if d <= r]
 		return near_nodes
 
 	def rewire(self, new_node, near_nodes):
 		for near_node in near_nodes:
-			temp_node = self.steer(new_node, near_node)
+			p1 = time.time()
+			px, py, pangle, mode, plength, u = plan.dubins_path_planning(new_node.pose[0], new_node.pose[1], new_node.pose[2], near_node.pose[0], near_node.pose[1], near_node.pose[2], self.max_curvature)
+			p2 = time.time()
+			self.local_planner_time += (p2 - p1)
+			avg_var_per_length = (new_node.total_var + self.path_var(px, py, pangle)) / (new_node.dist + plength)
 			if near_node.dist != 0:
-				if near_node.total_var / near_node.dist > temp_node.total_var / temp_node.dist and self.check_collision(temp_node) \
-						and self.max_dist >= temp_node.dist and self.check_loop(near_node, new_node):
-					near_node.__dict__.update(vars(temp_node))
-					self.propagate_update_to_children(near_node)
+				if near_node.total_var / near_node.dist > avg_var_per_length and self.max_dist >= new_node.dist + plength \
+						and self.check_loop(near_node, new_node):
+					if self.check_collision_path(px, py):
+						near_node.parent = new_node
+						near_node.path_x = px
+						near_node.path_y = py
+						near_node.path_angle = pangle
+						near_node.u = u
+						near_node.total_var = near_node.parent.total_var + self.path_var(px, py, pangle)
+						near_node.dist = near_node.parent.dist + plength
+						self.propagate_update_to_children(near_node)
 
 	def propagate_update_to_children(self, parent_node):
 		for node in self.node_list:
@@ -163,13 +183,19 @@ class PRM_star_Dubins:
 			temp = temp.parent
 		return True                # does not create a loop
 
-	def check_collision(self, node):
-		if self.obstacles is not None:
-			for (x, y, side) in self.obstacles:
-				for (nx, ny) in zip(node.path_x, node.path_y):
-					if ((nx > x - .8 * side / 2) & (nx < x + .8 * side / 2) & (ny > y - side / 2) & (
-								ny < y + side / 2)):
-						return False  # collision
+	def check_collision_path(self, px, py):
+		# check for collision on path
+		for kk in range(len(px)):
+			if not self.check_collision(px[kk], py[kk]):
+				return False
+		return True
+
+	def check_collision(self, x_node, y_node):
+		if self.obstacles is None:
+			return True   # safe
+		for (x, y, side) in self.obstacles:
+			if (x_node > x - .8 * side / 2) and (x_node < x + .8 * side / 2) and (y_node > y - side / 2) and (y_node < y + side / 2):
+				return False  # collision
 
 		return True  # safe
 
@@ -178,23 +204,24 @@ class PRM_star_Dubins:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	# def cost(self, px, py, pangle, plength):
-	# 	control_cost = 0  # NOT USED!!!!!!
+	# def cost(self, px, py, pangle, plength):          # more than 2/3 of time here and the rest of time in dubins path planner
+	# 	control_cost = 0        # NOT USED!!!!!!
 	# 	var_cost = np.zeros(len(px))
+	#
 	# 	(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
-	# 	A = np.zeros(shape=(n + p, 1)).astype(float)
-	# 	# iterate over path and calculate cost
-	# 	for kk in range(len(px)):  # Iterate over length of trajectory
+	#
+	# 	#iterate over path and calculate cost
+	# 	for kk in range(len(px)):      # Iterate over length of trajectory
 	# 		if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
-	# 			var_cost[kk] = Config.border_variance_penalty  # value of 5
+	# 			var_cost[kk] = Config.border_variance_penalty
 	# 			control_cost += 0
 	# 		else:
 	# 			p1 = time.time()
-	# 			A_z = interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
+	# 			A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
+	# 			self.method_time += (time.time() - p1)
 	# 			var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
 	# 			control_cost += 0
-	# 			self.method_time += (time.time() - p1)
-	# 	return np.sum(var_cost)
+	# 	return np.sum(var_cost) * plength
 
 	def path_var(self, px, py, pangle):       # returns negative total variance along the path
 		control_cost = 0  # NOT USED!!!!!!
@@ -229,7 +256,7 @@ class PRM_star_Dubins:
 			plot.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
 			plot.axis(self.space)
 			plot.grid(True)
-			plot.title("PRM* (avg variance per path length as cost function)")
+			plot.title("RRT* (avg variance per path length as cost function)")
 			plot.pause(.1)  # need for animation
 
 def dist(node1, node2):
@@ -238,8 +265,8 @@ def dist(node1, node2):
 					 (node2.pose[1] - node1.pose[1]) ** 2 +
 					 3 * min((node1.pose[2] - node2.pose[2]) ** 2, (node1.pose[2] - node2.pose[2] + 2*math.pi) ** 2, (node1.pose[2] - node2.pose[2] - 2*math.pi) ** 2))
 
+# Calculate new observation vector through shape function interpolation
 def interpolation_matrix(x_local2, n, p, lx, xg_min, yg_min, de):
-	# Calculate new observation vector through shape function interpolation
 	"""INTERPOLATION MATRIX:
 	Define shape function matrix that maps grid vertices to
 	continuous measurement locations"""

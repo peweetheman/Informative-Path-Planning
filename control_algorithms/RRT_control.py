@@ -1,42 +1,44 @@
-from Node import Node
-from true_field import true_field
-import dubins_path_planner as plan
-import Config
-import random
 import math
-import copy
-import numpy as np
+import random
 import time
-import matplotlib.pyplot as plt
+
+import numpy as np
+
+import Config
+from control_algorithms.Node import Node
+from control_algorithms.local_planners import dubins_path_planner as plan
 
 
 class RRT:
 	# Modified RRT algorithm using avg variance per length as cost function
 
-	def __init__(self, start, space, obstacles, var_x=None, gmrf_params=None, growth=4.0, max_iter=50, max_dist=40, min_dist=3, max_curvature=1.0):
+	def __init__(self, start, RRT_params, gmrf_params, var_x, max_dist, plot, min_dist=3):
 		"""
-		:param start: [x,y] starting location
-		:param space: [min,max] bounds on square space
-		:param obstacles: list of square obstacles
-		:param growth: size of growth each new sample
-		:param max_iter: max number of iterations for algorithm
+		:param start: initial location of agent
+		:param RRT_params: specified in config file
+		:param gmrf_params: specified in config file
+		:param var_x: variance of field as a 1D vector of variance of each node in GMRF
+		:param max_dist: maximum distance that the algorithm solution will return
+		:param min_dist: minimum distance that the algorithm solution will return
+		:param plot: only used for plotting in the middle of running algorithm good for debugging
 		"""
 		self.start = Node(start)
 		self.node_list = [self.start]
-		self.space = space
-		self.growth = growth
-		self.max_iter = max_iter
 		self.max_dist = max_dist
 		self.min_dist = min_dist
-		self.obstacles = obstacles
 		self.var_x = var_x
+		(self.space, self.max_time, self.max_curvature, self.growth, self.obstacles) = RRT_params
 		self.gmrf_params = gmrf_params
-		self.max_curvature = max_curvature
 		self.local_planner_time = 0.0
 		self.method_time = 0.0
 
 	def control_algorithm(self):
-		for i in range(self.max_iter):
+		start_time = time.time()
+		while True:
+			current_time = time.time() - start_time
+			if current_time > self.max_time:
+				break
+
 			sample = self.get_sample()
 			nearest_node = self.nearest_node(sample)
 			new_node = self.steer(nearest_node, sample)
@@ -45,7 +47,6 @@ class RRT:
 				near_nodes = self.get_near_nodes(new_node)
 				self.set_parent(new_node, near_nodes)
 				if new_node.parent is None:  # no possible path from any of the near nodes
-					print("new_node.parent is none (printed in main algo)")
 					continue
 				self.node_list.append(new_node)
 			# draw added edges
@@ -54,7 +55,7 @@ class RRT:
 		last_node = self.get_best_last_node()
 		path, u_optimal, tau_optimal = self.get_path(last_node)
 
-		return path, u_optimal, tau_optimal, self.local_planner_time, self.method_time
+		return path, u_optimal, tau_optimal
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
@@ -68,8 +69,16 @@ class RRT:
 		dx = np.cos(source_node.pose[2] + dtheta / 2)
 		dy = np.sin(source_node.pose[2] + dtheta / 2)
 		vec = np.array([dx, dy, dtheta])
-
 		new_node = Node(source_node.pose + self.growth * vec)
+
+		if new_node.pose[0] < self.space[0]:
+			new_node.pose[0] = self.space[0] - random.uniform(0, 1)
+		if new_node.pose[0] > self.space[1]:
+			new_node.pose[0] = self.space[1] - random.uniform(0, 1)
+		if new_node.pose[1] < self.space[2]:
+			new_node.pose[1] = self.space[2] - random.uniform(0, 1)
+		if new_node.pose[1] > self.space[3]:
+			new_node.pose[1] = self.space[3] - random.uniform(0, 1)
 		return new_node
 
 	def set_parent(self, new_node, near_nodes):
@@ -89,7 +98,6 @@ class RRT:
 		mincost = min(cost_list)
 		min_node = near_nodes[cost_list.index(mincost)]
 		if mincost == float("inf"):
-			print("no parent found (in set)")
 			return
 
 		new_node.parent = min_node
@@ -236,8 +244,7 @@ class RRT:
 			for node in self.node_list:
 				plot.quiver(node.pose[0], node.pose[1], math.cos(node.pose[2]), math.sin(node.pose[2]), color='m')
 				if node.parent is not None:
-					for (x, y) in zip(node.path_x, node.path_y):
-						plt.plot(x, y, "yH", markersize=2)
+					plot.plot(node.path_x, node.path_y, color='green')
 
 			if self.obstacles is not None:
 				for (x, y, side) in self.obstacles:

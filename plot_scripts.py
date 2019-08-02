@@ -7,7 +7,11 @@ website: https://github.com/AndReGeist
 license: BSD
 Please feel free to use and modify this, but keep the above information. Thanks!
 """
-
+"""
+addition and modification of file by Patrick Phillips summer 2019
+email: pphill10@u.rochester.edu
+website: https://github.com/peweetheman
+"""
 import Config
 import numpy as np
 import matplotlib.pyplot as plt
@@ -56,15 +60,15 @@ def initialize_animation1(true_field, x_auv, vmin, vmax, var_min, var_max, level
 	hyper_x, hyper_y = _xx.ravel(), _yy.ravel()
 	colors = plt.cm.jet(np.arange(len(hyper_x)) / float(np.arange(len(hyper_x)).max()))
 
-	ax3 = fig1.add_subplot(224, projection='3d')
-	print("alpha prior len: ", len(alpha_prior))
-	ticksx = np.arange(0.5, len(alpha_prior) + 0.5, 1)
-	plt.xticks(ticksx, alpha_prior)
-	plt.yticks(ticksx, kappa_prior)
-	ax3.set_xlabel('alpha')
-	ax3.set_ylabel('kappa')
-	ax3.set_zlabel('p(theta)')
-	ax3.set_title('GMRF Hyperparameter Estimate')
+	# ax3 = fig1.add_subplot(224, projection='3d')
+	# print("alpha prior len: ", len(alpha_prior))
+	# ticksx = np.arange(0.5, len(alpha_prior) + 0.5, 1)
+	# plt.xticks(ticksx, alpha_prior)
+	# plt.yticks(ticksx, kappa_prior)
+	# ax3.set_xlabel('alpha')
+	# ax3.set_ylabel('kappa')
+	# ax3.set_zlabel('p(theta)')
+	# ax3.set_title('GMRF Hyperparameter Estimate')
 
 	plt.draw()
 	trajectory_1 = np.array(x_auv).reshape(1, 3)
@@ -157,9 +161,7 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 		plt.plot(trajectory_1[:, 0], trajectory_1[:, 1], color='yellow')
 
 		if sampling_control is not None:
-			time1 = time.time()
 			sampling_control.draw_graph(plot=plt)
-			print("calc time sampling algo plotting: ", time.time() - time1)
 		plt.plot(tau_optimal[0, :], tau_optimal[1, :], color='blue')
 		plt.quiver(x_auv[0], x_auv[1], np.cos(x_auv[2]), np.sin(x_auv[2]), width=.005)
 
@@ -167,8 +169,8 @@ def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, tr
 			for jj in range(0, Config.n_k):  # Iterate over all trajectories
 				plt.plot(tau_x[0, :, jj], tau_x[1, :, jj], color='black')
 			"""Plot Hyperparameter estimate"""
-			ax3 = fig1.add_subplot(224, projection='3d')
-			ax3.set_title("Hyperparameter estimate")
+			# ax3 = fig1.add_subplot(224, projection='3d')
+			# ax3.set_title("Hyperparameter estimate")
 		# colors = plt.cm.jet(pi_theta.flatten() / float(pi_theta.max()))  # Color height dependent
 		# ax3.bar3d(x, y, bottom, 1, 1, pi_theta, color=colors, alpha=0.5)
 

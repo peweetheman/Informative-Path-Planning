@@ -10,6 +10,7 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 
 import Config
 
+import os
 import numpy as np
 import scipy
 import scipy.sparse as sp
@@ -310,8 +311,6 @@ def calculate_precision_matrix(lx, ly, kappa, alpha, car1=False):
 
 
 """SAMPLE from GMRF"""
-
-
 def sample_from_GMRF(gmrf_dim, kappa, alpha, car_var, plot_gmrf=False):
 	x_min, x_max, y_min, y_max = Config.field_dim
 	lxf, lyf, dvx, dvy = gmrf_dim
@@ -426,7 +425,7 @@ class GMRF:
 				B2 = sp.csr_matrix.dot(FT_sparse, Q_temporary.dot(F_sparse)) + T_sparse
 				H1 = sp.hstack([Q_temporary, A2])
 				H2 = sp.hstack([B1, B2])
-				filename = "Q_t_" + str(jj)
+				filename = os.path.join('gp_scripts', 'Q_t_' + str(jj))
 				Q_t = sp.vstack([H1, H2]).tocsr()
 				setattr(self, filename, Q_t)
 				np.savez(filename, data=Q_t.data, indices=Q_t.indices,
@@ -439,18 +438,18 @@ class GMRF:
 									 np.hstack([D1, T_inv])])
 
 				self.diag_Q_t_inv[:, jj] = Q_t_inv.diagonal()
-			np.save('diag_Q_t_inv.npy', self.diag_Q_t_inv)
+			np.save(os.path.join('gp_scripts', 'diag_Q_t_inv.npy'), self.diag_Q_t_inv)
 
 		else:
 			print('Loading precalculated matrices')
 			for j2 in range(0, l_TH):
-				filename = "Q_t_" + str(j2)
+				filename = os.path.join('gp_scripts', "Q_t_" + str(j2))
 				loader = np.load(filename + '.npz')
 				Q_t2 = sp.csr_matrix((loader['data'], loader['indices'], loader['indptr']),
 									 shape=loader['shape'])
-				filename2 = "Q_t_" + str(j2)
+				filename2 = os.path.join('gp_scripts', "Q_t_" + str(j2))
 				setattr(self, filename2, Q_t2)
-			self.diag_Q_t_inv = np.load('diag_Q_t_inv.npy')
+			self.diag_Q_t_inv = np.load(os.path.join('gp_scripts', 'diag_Q_t_inv.npy'))
 
 		"""Initialize adaptive GMRF algorithm matrices"""
 		self.b = np.zeros(shape=(n + p, 1))  # Canonical mean
@@ -480,7 +479,7 @@ class GMRF:
 
 		for jj in range(0, l_TH):
 			"""Calculate observation precision (?)"""
-			filename = "Q_t_" + str(jj)
+			filename = os.path.join('gp_scripts', "Q_t_" + str(jj))
 			Q_temporary = getattr(self, filename)
 			Q_temporary = Q_temporary
 			self.h_theta[:, jj] = scipy.sparse.linalg.spsolve(Q_temporary, u_sparse).T
@@ -504,7 +503,7 @@ class GMRF:
 
 		for hh in range(0, l_TH):
 			"""Compute canonical mean"""
-			filename = "Q_t_" + str(jj)
+			filename = os.path.join('gp_scripts', "Q_t_" + str(jj))
 			Q_temporary = getattr(self, filename)
 			self.mue_theta[:, hh] = scipy.sparse.linalg.spsolve(Q_temporary, self.b).T
 			"""Compute Likelihood"""

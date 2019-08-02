@@ -1,15 +1,23 @@
 """
-Config file containing all static parameters and functions used in the PI-GMRF algorithm.
-
-author: Andreas Rene GEist
+Config file containing all static parameters and functions used in the
+author: Andreas Rene Geist
 email: andreas.geist@tuhh.de
 website: https://github.com/AndReGeist
 license: BSD
 Please feel free to use and modify this, but keep the above information. Thanks!
 """
+"""
+addition and modification of file by Patrick Phillips summer 2019
+email: pphill10@u.rochester.edu
+website: https://github.com/peweetheman
+"""
 
 import numpy as np
-from scipy import exp, sin, cos, sqrt, pi, interpolate
+from control_algorithms.PRM_star_control import PRM_star
+from control_algorithms.RRT_star_control import RRT_star
+from scipy import sin, cos, sqrt, pi
+from control_algorithms.PRM_control import PRM
+from control_algorithms.RRT_control import RRT
 
 """Configure the simulation parameters"""
 # AUV starting state
@@ -17,21 +25,21 @@ x_auv = np.array([0.1, 0.1, 0.785]).T  # Initial AUV state
 v_auv = 1.0  # AUV velocity in meter/second (constant)
 
 # Field dimensions
-field_dim = [0, 10, 0, 5]  # x_min , x_max, y_min, y_max
+field_dim = [0, 9.9, 0, 4.9]  # x_min , x_max, y_min, y_max
 
 # Simulation variables
+plot = True      # whether or not to plot while running
 sigma_w_squ = 0.2 ** 2  # Measurement variance
 sample_time_gmrf = 100  # Sample/Calculation time in ms of GMRF algorithm
 simulation_end_time = 2000000 # Run time of simulation in ms
-simulation_max_dist = 30   # max distance of path for simulation tests
 
 """Choose GMRF parameters"""
 gmrf_dim = [50, 25, 15, 15]  # lxf, lyf, dvx, dvy
-set_Q_init = True  # Re-Calculate precision matrix at Initialization? False: Load stored precision matrix
+set_Q_init = False  # Re-Calculate precision matrix at Initialization? False: Load stored precision matrix
 set_Q_check = False  # Plots Q matrix entries inside GMRF algorithm
 set_gmrf_torus = True  # True -w> GMRF uses torus boundary condition, False -> GMRF uses Neumann-BC
-set_GMRF_cartype = True  # Use car(1)? <-> True, Default is car(2) from Choi et al
-set_prior = 1  # Choose prior case from below
+set_GMRF_cartype = False  # Use car(1)? <-> True, Default is car(2) from Choi et al
+set_prior = 3  # Choose prior case from below
 if set_GMRF_cartype == False:
 	if set_prior == 1:
 		# Choi Parameter (size 1)
@@ -72,24 +80,49 @@ elif set_GMRF_cartype == True:
 		kappa_prior = np.array([1]).astype(float)
 		alpha_prior = np.array([3, 1, 0.5, 0.3, 0.1, 0.01]).astype(float)
 
-"""Choose control parameters"""
+
+"""CONTROL PARAMETERS"""
+simulation_max_dist = 40   			# max distance of path for simulation tests
+sigma_epsilon = pi / 16  # Exploration noise in radians, 90 grad = 1,57
+R_cost = 5 * np.ones(shape=(1, 1))  # Immediate control cost. This is not yet incorporated in sampling algorithms
+border_variance_penalty = 5
+
+"""Choose control parameters for PI algorithm"""
 set_sanity_check = True  # Calculates cost for the optimal path and plots the optimal path
 n_updates = 10  # Control loop updates
 n_k = 10  # Number of virtual roll-out pathes
 n_horizon = 10  # Control horizon length in s
 N_horizon = 10  # Number of discrete rollout points
 t_cstep = n_horizon / N_horizon  # Control horizon step size in s
-sigma_epsilon = pi / 16  # Exploration noise in radians, 90 grad = 1,57
-R_cost = 5 * np.ones(shape=(1, 1))  # Immediate control cost
-border_variance_penalty = 5
 pi_parameters = (n_updates, n_k, n_horizon, N_horizon, t_cstep, sigma_epsilon, R_cost)
+
+"""Choose control parameters for sampling control algorithms"""
+control_algo = 'PRM_star'      # choose either 'RRT_star', 'PRM_star', 'RRT', 'PRM'
+max_runtime = 0.20  					# Runtime for the sampling algorithm to end after. Typically takes .05 seconds more than this runtime.
+max_curvature = 1.0     			# maximum curvature of a path allowed for the robot
+growth = 2.0       					# distance that RRT algorithms will steer nearest node to new node
+obstacles = None  					# any obstacles in the field. currently only handles squares specified by x,y location and side length
+RRT_params = (field_dim, max_runtime, max_curvature, growth, obstacles)
+PRM_params = (field_dim, max_runtime, max_curvature, obstacles)
+
+
+def control_algorithm(start, u_optimal, gmrf_params, var_x, max_dist, plot):
+	if control_algo == 'RRT_star':
+		return RRT_star(start, RRT_params, gmrf_params, var_x, max_dist, plot)
+	elif control_algo == 'PRM_star':
+		return PRM_star(start, PRM_params, gmrf_params, var_x, max_dist, plot)
+	elif control_algo == 'RRT':
+		return RRT(start, RRT_params, gmrf_params, var_x, max_dist, plot)
+	elif control_algo == 'PRM':
+		return PRM(start, PRM_params, gmrf_params, var_x, max_dist, plot)
+
+
 
 #################################################################################################
 """DEFINE GENERAL FUNCTIONS"""
 
-
 # AUV model
-def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_limits, set_border=True):
+def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_dim, set_border=True):
 	x_auv_out = np.zeros(shape=3)
 	x_auv_out[2] = x_auv[2] + u_auv * delta_t + epsilon_a * sqrt(delta_t)  # computes angle
 	x_auv_out[0] = x_auv[0] + v_auv * cos(x_auv_out[2]) * delta_t
@@ -97,44 +130,17 @@ def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_limits, set_border=True
 
 	if set_border == True:
 		# Prevent AUV from leaving the true field
-		if x_auv_out[0] < 0:
-			x_auv_out[0] = 0
+		if x_auv_out[0] < field_dim[0]:
+			x_auv_out[0] = field_dim[0]
 
-		if x_auv_out[1] < 0:
-			x_auv_out[1] = 0
+		if x_auv_out[1] < field_dim[2]:
+			x_auv_out[1] = field_dim[2]
 
-		if x_auv_out[0] > field_limits[0]:
-			x_auv_out[0] = field_limits[0]
+		if x_auv_out[0] > field_dim[1]:
+			x_auv_out[0] = field_dim[1]
 
-		if x_auv_out[1] > field_limits[1]:
-			x_auv_out[1] = field_limits[1]
-			# if x_auv_out[0] < 0:
-			#     x_auv_out[0] = 0
-			#     if pi / 2 < x_auv_out[2] < pi:
-			#         x_auv_out[2] = 0.49 * pi
-			#     if pi < x_auv_out[2] < 1.5 * pi:
-			#         x_auv_out[2] = 1.51 * pi
-			#
-			# if x_auv_out[1] < 0:
-			#     x_auv_out[1] = 0
-			#     if pi < x_auv_out[2] < 1.49 * pi:
-			#         x_auv_out[2] = pi
-			#     if 1.5 * pi < x_auv_out[2] <= 2 * pi:
-			#         x_auv_out[2] = 0.01
-			#
-			# if x_auv_out[0] > field_limits[0]:
-			#     x_auv_out[0] = field_limits[0]
-			#     if 0 < x_auv_out[2] < pi / 2:
-			#         x_auv_out[2] = 0.51 * pi
-			#     if 1.5 * pi < x_auv_out[2] <= 2 * pi:
-			#         x_auv_out[2] = 1.49 * pi
-			#
-			# if x_auv_out[1] > field_limits[1]:
-			#     x_auv_out[1] = field_limits[1]
-			#     if 0 < x_auv_out[2] < pi / 2:
-			#         x_auv_out[2] = 1.99 * pi
-			#     if pi / 2 < x_auv_out[2] < pi:
-			#         x_auv_out[2] = 1.01 * pi
+		if x_auv_out[1] > field_dim[3]:
+			x_auv_out[1] = field_dim[3]
 
 	if x_auv_out[2] > 2 * pi:
 		a_pi = int(x_auv_out[2] / 2 * pi)

@@ -1,16 +1,17 @@
-from Node import Node
-import dubins_path_planner as plan
-from true_field import true_field
-import random
-import math
 import copy
-import numpy as np
+import math
+import random
 import time
+
 import matplotlib.pyplot as plt
+import numpy as np
+
+from control_algorithms.Node import Node
+from control_algorithms.local_planners import dubins_path_planner as plan
 
 
-class RRT_star:
-	# RRT ALGORITHM USING DUBINS PATHS FOR FINDING PATH FROM START TO END LOCATION
+class PRM_star:
+	# PRM* ALGORITHM USING DUBINS PATHS, AND DISTANCE COST FUNCTION. PATH_PLANNING FILES ARE FOR FINDING PATH FROM START TO END LOCATION
 
 	def __init__(self, start, end, space, obstacles, growth=0.5, max_iter=50, end_sample_percent=5, max_curvature=1.0):
 		"""
@@ -43,7 +44,7 @@ class RRT_star:
 					continue
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
-			# draw added edges
+			# draw added edges, comment out this line if you don't want animation
 			self.draw_graph()
 
 		# generate path
@@ -63,7 +64,7 @@ class RRT_star:
 			sample = Node(self.end.pose)
 		return sample
 
-	def steer(self, source_node, destination_node):
+	def local_path(self, source_node, destination_node):
 		# take source_node and find path to destination_node
 		px, py, pyaw, mode, clen, u = plan.dubins_path_planning(source_node.pose[0], source_node.pose[1], source_node.pose[2], destination_node.pose[0], destination_node.pose[1], destination_node.pose[2], self.max_curvature)
 		new_node = copy.deepcopy(source_node)
@@ -83,7 +84,7 @@ class RRT_star:
 			near_nodes.append(self.nearest_node(sample_node))
 		dlist = []
 		for near_node in near_nodes:
-			temp_node = self.steer(near_node, sample_node)
+			temp_node = self.local_path(near_node, sample_node)
 			if self.check_collision(temp_node):
 				dlist.append(temp_node.dist)
 			else:
@@ -93,7 +94,7 @@ class RRT_star:
 		min_node = near_nodes[dlist.index(mindist)]
 		if mindist == float("inf"):
 			return None
-		new_node = self.steer(min_node, sample_node)
+		new_node = self.local_path(min_node, sample_node)
 		return new_node
 
 	def get_best_last_node(self):
@@ -123,7 +124,7 @@ class RRT_star:
 
 	def rewire(self, new_node, near_nodes):
 		for near_node in near_nodes:
-			temp_node = self.steer(new_node, near_node)
+			temp_node = self.local_path(new_node, near_node)
 			if near_node.dist > temp_node.dist and self.check_collision(temp_node):
 				near_node.__dict__.update(vars(temp_node))
 
@@ -142,7 +143,7 @@ class RRT_star:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def cost(self, node1, node2):
+	def cost(self, node1, node2):    # NOT USED, distance is cost
 		return 0
 
 	def draw_graph(self):
@@ -181,12 +182,12 @@ def main():
 		(22, 12, 5),
 		(9, 15, 4)]
 
-	# calling RRT*
-	rrt_star = RRT_star(start=[15.0, 28.0, np.deg2rad(0.0)], end=[15.0, 5.0, np.deg2rad(0.0)], space=[0, 30, 0, 30], obstacles=obstacles)
-	path = rrt_star.rrt_star_algorithm()
+	# calling PRM*
+	PRM_star1 = PRM_star(start=[15.0, 28.0, np.deg2rad(0.0)], end=[15.0, 5.0, np.deg2rad(0.0)], space=[0, 30, 0, 30], obstacles=obstacles)
+	path = PRM_star1.rrt_star_algorithm()
 
 	# plotting code
-	rrt_star.draw_graph()
+	PRM_star1.draw_graph()
 	if path is not None:
 		plt.plot([node.pose[0] for node in path], [node.pose[1] for node in path], '-r')
 	plt.grid(True)

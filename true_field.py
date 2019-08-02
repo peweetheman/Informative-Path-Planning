@@ -1,11 +1,15 @@
 import Config
-import gp_scripts
+from gp_scripts import gp_scripts
 import scipy
 import numpy as np
 
 # AUV starting state
 x_auv = Config.x_auv
-
+"""
+Patrick Phillips summer 2019
+email: pphill10@u.rochester.edu
+website: https://github.com/peweetheman
+"""
 
 class true_field:
 	# Calculate TEMPERATURE FIELD (Ground truth)

@@ -1,12 +1,12 @@
-from Node import Node
-import dubins_path_planner as plan
-from true_field import true_field
-import random
 import math
-import copy
-import numpy as np
+import random
 import time
+
 import matplotlib.pyplot as plt
+import numpy as np
+
+from control_algorithms.Node import Node
+from control_algorithms.local_planners import dubins_path_planner as plan
 
 
 class RRT_star:
