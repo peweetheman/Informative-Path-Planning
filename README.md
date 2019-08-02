@@ -6,12 +6,13 @@ This code builds off of the work by Andre Rene Geist. Its purpose is to research
 The directory contains 4 package folders. Alphabetically, the first is the ‘control_algorithms’ package. This package contains the 4 sampling control algorithms PRM, PRM*, RRT, and RRT* in appropriately named files ‘PRM_control’, PRM_star_control’ and so on. The package also contains a ‘random_walk_control.py’ file, and a ‘control_scripts.py’ file. The ‘control_scripts.py’ file contains the PI^2 algorithm. This package also contains the local_planner package and some helper classes. There are several local planners, the one used in all of the algorithms is just the simple dubins_path_planner, which is simply described online.
 
 The second package is the ‘data’ package. This contains the data collected on the performance of algorithms. New data is automatically collected and stored in this package after every run. Each file has the name of the control algorithm and then the maximum time the algorithm was allowed to run for at each iteration. The shape of the data is a numpy array as follows:
+data=
 
-data =[path_length1, path_length2…........max_path_length
-	     total variance1, total variance2,..total variance n   
-	     field variance1,field variance2 ...field variance n
-	     RMSE1, 	RMSE2.....................RMSE n
-	     calc_time 1, calc_time2.......calc_time_n                      ]                
+	     [[path_length1, path_length2…........max_path_length]
+	     [total variance1, total variance2,..total variance n]  
+	     [field variance1,field variance2 ...field variance n]	     
+	     [RMSE1, 	RMSE2.....................RMSE n	 ]	     
+	     [calc_time 1, calc_time2.......calc_time_n         ]]                  
 
 The third package is called ‘gp_scripts.’ This contains the code for the Gaussian Markov Random Field (GMRF) representation of the changing estimated field. It also has the stored precision matrices used for quicker initialization. Whether these are used or precision matrices are reinitialized can be set in the Config file. 
 
