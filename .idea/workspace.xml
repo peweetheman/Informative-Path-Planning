@@ -722,7 +722,14 @@
       <option name="project" value="LOCAL" />
       <updated>1565184037213</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="worked on some stuff i think&#10;cleaned code">
+      <created>1565184062145</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1565184062145</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TodoView" selected-index="2">
@@ -794,7 +801,8 @@
     <MESSAGE value="started working on implementing automatic benchmarking and evaluation functions" />
     <MESSAGE value="writing data of path length, measures of algorithm to file apropriately after runs now" />
     <MESSAGE value="worked on some stuff i think&#10;" />
-    <option name="LAST_COMMIT_MESSAGE" value="worked on some stuff i think&#10;" />
+    <MESSAGE value="worked on some stuff i think&#10;cleaned code" />
+    <option name="LAST_COMMIT_MESSAGE" value="worked on some stuff i think&#10;cleaned code" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
