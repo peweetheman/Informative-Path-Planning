@@ -1,5 +1,4 @@
 Patrick Phillips
-
 Informative Path Planning Project
 
 This code builds off of the work by Andre Rene Geist. Its purpose is to research and explore the effectiveness of various sampling algorithms in solving the informative path planning problem.
