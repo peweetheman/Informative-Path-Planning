@@ -2,18 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="361428ed-a5c5-4bc0-83c5-58c4af57d0ea" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/path_planning_algorithms/Node.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/path_planning_algorithms/kd_tree.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/control_algorithms/PRM_star_path_planning.py" afterPath="$PROJECT_DIR$/path_planning_algorithms/PRM_star_path_planning.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Config.py" afterPath="$PROJECT_DIR$/Config.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/control_algorithms/PRM_control.py" afterPath="$PROJECT_DIR$/control_algorithms/PRM_control.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/control_algorithms/PRM_star_control.py" afterPath="$PROJECT_DIR$/control_algorithms/PRM_star_control.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/control_algorithms/RRT_control.py" afterPath="$PROJECT_DIR$/control_algorithms/RRT_control.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/control_algorithms/RRT_star_control.py" afterPath="$PROJECT_DIR$/control_algorithms/RRT_star_control.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/main.py" afterPath="$PROJECT_DIR$/main.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/path_planning_algorithms/RRT_star_path_planning.py" afterPath="$PROJECT_DIR$/path_planning_algorithms/RRT_star_path_planning.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/plot_data.py" afterPath="$PROJECT_DIR$/plot_data.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/README.md" afterPath="$PROJECT_DIR$/README.md" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -91,7 +81,7 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="RRT_star_path_planning.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="RRT_star_path_planning.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/path_planning_algorithms/RRT_star_path_planning.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="504">
@@ -107,6 +97,16 @@
                 <element signature="e#8407#8421#0" expanded="false" />
                 <element signature="e#8459#9135#0" expanded="false" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="README.md" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/README.md">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="168">
+              <caret line="8" column="0" lean-forward="true" selection-start-line="8" selection-start-column="0" selection-end-line="8" selection-end-column="0" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -198,8 +198,8 @@
       <find>per path</find>
       <find>succee</find>
       <find>REWIRE</find>
-      <find>print(&quot;</find>
       <find>sigma_e</find>
+      <find>print(&quot;</find>
     </findStrings>
     <replaceStrings>
       <replace>true_field1.z_field</replace>
@@ -260,7 +260,6 @@
         <option value="$PROJECT_DIR$/diag_Q_t_inv.npy" />
         <option value="$PROJECT_DIR$/gp_scripts.py" />
         <option value="$PROJECT_DIR$/gp_scripts/gp_scripts.py" />
-        <option value="$PROJECT_DIR$/README.md" />
         <option value="$PROJECT_DIR$/plot_scripts.py" />
         <option value="$PROJECT_DIR$/true_field.py" />
         <option value="$PROJECT_DIR$/plot_data.py" />
@@ -272,6 +271,7 @@
         <option value="$PROJECT_DIR$/Config.py" />
         <option value="$PROJECT_DIR$/path_planning_algorithms/PRM_star_path_planning.py" />
         <option value="$PROJECT_DIR$/path_planning_algorithms/RRT_star_path_planning.py" />
+        <option value="$PROJECT_DIR$/README.md" />
       </list>
     </option>
   </component>
@@ -709,7 +709,14 @@
       <option name="project" value="LOCAL" />
       <updated>1564752969745</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="worked on some stuff i think&#10;">
+      <created>1565183890799</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1565183890799</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TodoView" selected-index="2">
@@ -729,9 +736,9 @@
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32985386" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25993884" sideWeight="0.5045822" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32776618" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.04697286" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.013569937" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32672232" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24425887" sideWeight="0.4954178" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.24425887" sideWeight="0.4954178" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.2816594" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32985386" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.22379912" sideWeight="0.5043011" order="1" side_tool="true" content_ui="tabs" />
@@ -1019,14 +1026,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/README.md">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/gp_scripts/gp_scripts.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="147">
@@ -1194,6 +1193,14 @@
             <element signature="e#8407#8421#0" expanded="false" />
             <element signature="e#8459#9135#0" expanded="false" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="168">
+          <caret line="8" column="0" lean-forward="true" selection-start-line="8" selection-start-column="0" selection-end-line="8" selection-end-column="0" />
+          <folding />
         </state>
       </provider>
     </entry>
