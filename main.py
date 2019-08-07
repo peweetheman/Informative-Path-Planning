@@ -54,9 +54,6 @@ for iter in range(100):
 	myplot=None
 	for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 		if time_in_ms % Config.sample_time_gmrf < 0.0000001:
-				# Calculate next AUV state
-			trajectory_1 = np.vstack([trajectory_1, x_auv])
-
 			# Compute discrete observation vector and new observation
 			sd_obs = [int((x_auv[1]) * 1e2), int((x_auv[0]) * 1e2)]
 			# print("sd_obs", sd_obs, np.array(true_field1.z_field[sd_obs[0], sd_obs[1]]))
@@ -69,30 +66,28 @@ for iter in range(100):
 			time_4 = time.time()
 			# print("Calc. time GMRF: /", "{0:.2f}".format(time_4 - time_3))
 
-			# Calculate optimal control path with one of the following control scripts. Comment and uncomment regions
-
-			"""PI algo"""
-			# u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, Config.field_dim, Config.set_sanity_check)
-			# control = None
-			# x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, Config.field_dim)
-
-			"""sampling algos, select in config file"""
-			control = Config.control_algorithm(start=x_auv, u_optimal=u_optimal, gmrf_params=gmrf1.params, var_x=var_x, max_dist=Config.simulation_max_dist-path_length, plot=myplot)
-			path_optimal, u_optimal, tau_optimal = control.control_algorithm()
-			x_auv = tau_optimal[:, 4]
-			tau_x = None
-
+			# Run control algorithm to calculate new path. Select which one in Config file.
+			if Config.control_algo == 'PI':
+				u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, Config.field_dim, Config.set_sanity_check)
+				control = None
+				x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, Config.field_dim)
+			else:
+				control = Config.control_algorithm(start=x_auv, u_optimal=u_optimal, gmrf_params=gmrf1.params, var_x=var_x, max_dist=Config.simulation_max_dist-path_length, plot=myplot)
+				path_optimal, u_optimal, tau_optimal = control.control_algorithm()
+				x_auv = tau_optimal[:, 4]
+				tau_x = None
+			trajectory_1 = np.vstack([trajectory_1, x_auv])
 			time_5 = time.time()
 			control_calc_time = time_5 - time_4
 			print("Calc. time control script: /", "{0:.2f}".format(time_5 - time_4))
 
-			# Plot new GMRF belief and optimal control path
+			# Plot new GMRF belief and optimal control path. Comment out this region for quick data collection
 			if Config.plot is True:
 				traj, myplot = plot_scripts.update_animation1(control, pi_theta, fig1, hyper_x, hyper_y, bottom, colors, true_field1, x_auv, mue_x, var_x, gmrf1.params, trajectory_1, tau_x, tau_optimal, **plot_settings)
 				time_6 = time.time()
 				print("Calc. time Plot: /", "{0:.2f}".format(time_6 - time_5))
 
-			# calculate trajectory length and terminate after trajectory length exceeds bound
+			# Calculate trajectory length and terminate after trajectory length exceeds bound
 			path_length = 0
 			for kk in range(1, np.size(trajectory_1, axis=0)):
 				path_length += ((trajectory_1[kk, 0] - trajectory_1[kk-1, 0]) ** 2 + (trajectory_1[kk, 1] - trajectory_1[kk-1, 1]) ** 2)
@@ -121,7 +116,7 @@ for iter in range(100):
 					mean_RMSE += (gmrf1.mue_x[(ny * lx) + nx] - true_field1.f(de[0] * nx + xg_min, de[1] * ny + yg_min)) ** 2
 			mean_RMSE = sqrt(mean_RMSE)
 
-			# write to file
+			# organize data to write to file
 			col = np.vstack((path_length, total_variance_sum, field_variance_sum, mean_RMSE, control_calc_time))
 			data = np.concatenate((data, col), axis=1)
 	np.save(filename, data)

@@ -5,32 +5,31 @@ import time
 import numpy as np
 
 import Config
-from control_algorithms.Node import Node
 from control_algorithms.local_planners import dubins_path_planner as plan
+from path_planning_algorithms.Node import Node
 
 
 class RRT:
-	# Modified RRT algorithm using avg variance per length as cost function
+	# Modified RRT algorithm using avg variance per unit path length as cost function
 
-	def __init__(self, start, RRT_params, gmrf_params, var_x, max_dist, plot, min_dist=3):
+	def __init__(self, start, RRT_params, gmrf_params, var_x, max_dist, plot):
 		"""
 		:param start: initial location of agent
 		:param RRT_params: specified in config file
 		:param gmrf_params: specified in config file
 		:param var_x: variance of field as a 1D vector of variance of each node in GMRF
 		:param max_dist: maximum distance that the algorithm solution will return
-		:param min_dist: minimum distance that the algorithm solution will return
 		:param plot: only used for plotting in the middle of running algorithm good for debugging
 		"""
 		self.start = Node(start)
 		self.node_list = [self.start]
-		self.max_dist = max_dist
-		self.min_dist = min_dist
+		self.max_dist = max(max_dist, 10)   # can't just take the max_dist in case at the end of the simulation this will allow no possible paths
 		self.var_x = var_x
-		(self.space, self.max_time, self.max_curvature, self.growth, self.obstacles) = RRT_params
+		(self.space, self.max_time, self.max_curvature, self.growth, self.min_dist, self.obstacles) = RRT_params
 		self.gmrf_params = gmrf_params
 		self.local_planner_time = 0.0
 		self.method_time = 0.0
+		self.plot = plot
 
 	def control_algorithm(self):
 		start_time = time.time()
@@ -253,7 +252,7 @@ class RRT:
 			plot.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
 			plot.axis(self.space)
 			plot.grid(True)
-			plot.title("RRT (avg variance per path length as cost function)")
+			plot.title("RRT (avg variance per unit path length as cost function)")
 			plot.pause(.1)  # need for animation
 
 

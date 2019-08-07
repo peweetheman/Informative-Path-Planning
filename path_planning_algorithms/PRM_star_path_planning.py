@@ -6,14 +6,14 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from control_algorithms.Node import Node
 from control_algorithms.local_planners import dubins_path_planner as plan
+from path_planning_algorithms.Node import Node
 
 
 class PRM_star:
-	# PRM* ALGORITHM USING DUBINS PATHS, AND DISTANCE COST FUNCTION. PATH_PLANNING FILES ARE FOR FINDING PATH FROM START TO END LOCATION
+	# PRM* algorithm in x, y, theta configuration space using Dubin's path and distance as cost function
 
-	def __init__(self, start, end, space, obstacles, growth=0.5, max_iter=50, end_sample_percent=5, max_curvature=1.0):
+	def __init__(self, start, end, space, obstacles, growth=0.5, max_iter=300, end_sample_percent=5, max_curvature=1.0):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location
@@ -45,7 +45,7 @@ class PRM_star:
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
 			# draw added edges, comment out this line if you don't want animation
-			self.draw_graph()
+			# self.draw_graph()
 
 		# generate path
 		last_node = self.get_best_last_node()
@@ -127,6 +127,15 @@ class PRM_star:
 			temp_node = self.local_path(new_node, near_node)
 			if near_node.dist > temp_node.dist and self.check_collision(temp_node):
 				near_node.__dict__.update(vars(temp_node))
+				self.propagate_update_to_children(near_node)
+
+	def propagate_update_to_children(self, parent_node):
+		for node in self.node_list:
+			if node.parent is not None:
+				if node.parent == parent_node:
+					node.cost = parent_node.cost + node.path_dist
+					node.dist = parent_node.dist + node.path_dist
+					self.propagate_update_to_children(node)
 
 	def check_collision(self, node):
 		if self.obstacles is not None:

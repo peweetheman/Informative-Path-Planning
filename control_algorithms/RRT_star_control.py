@@ -5,30 +5,28 @@ import time
 import numpy as np
 
 import Config
-from control_algorithms.Node import Node
 from control_algorithms.local_planners import dubins_path_planner as plan
+from path_planning_algorithms.Node import Node
 
 
 class RRT_star:
-	# Basic RRT* algorithm using distance as cost function
+	# Basic RRT* algorithm using average variance per unit path length as cost function
 
-	def __init__(self, start, RRT_params, gmrf_params, var_x, max_dist, plot, min_dist=3):
+	def __init__(self, start, RRT_params, gmrf_params, var_x, max_dist, plot):
 		"""
 		:param start: initial location of agent
 		:param RRT_params: specified in config file
 		:param gmrf_params: specified in config file
 		:param var_x: variance of field as a 1D vector of variance of each node in GMRF
 		:param max_dist: maximum distance that the algorithm solution will return
-		:param min_dist: minimum distance that the algorithm solution will return
 		:param plot: only used for plotting in the middle of running algorithm good for debugging
 		"""
 		self.start = Node(start)
 		self.node_list = [self.start]
-		self.max_dist = max_dist
-		self.min_dist = min_dist
+		self.max_dist = max(max_dist, 10)   # can't just take the max_dist in case at the end of the simulation this will allow no possible paths
 		self.var_x = var_x
 		self.gmrf_params = gmrf_params
-		(self.space, self.max_time, self.max_curvature, self.growth, self.obstacles) = RRT_params
+		(self.space, self.max_time, self.max_curvature, self.growth, self.min_dist, self.obstacles) = RRT_params
 		self.local_planner_time = 0.0
 		self.method_time = 0.0
 		self.plot = plot
@@ -48,7 +46,6 @@ class RRT_star:
 				near_nodes = self.get_near_nodes(new_node)
 				self.set_parent(new_node, near_nodes)
 				if new_node.parent is None:    # no possible path from any of the near nodes
-					print("new_node.parent is none (printed in main algo)")
 					continue
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
@@ -100,8 +97,7 @@ class RRT_star:
 
 		mincost = min(cost_list)
 		min_node = near_nodes[cost_list.index(mincost)]
-		if mincost == float("inf"):
-			print("no parent found (in set)")
+		if mincost == float("inf"):   # No parent could be found
 			return
 		new_node.parent = min_node
 		# CALL TO LOCAL PATH PLANNER
@@ -120,6 +116,7 @@ class RRT_star:
 				cost_list.append(node.total_var/node.dist)
 			else:
 				cost_list.append(float("inf"))
+		print("min cost list", min(cost_list))
 		best_node = self.node_list[cost_list.index(min(cost_list))]
 		return best_node
 
@@ -204,25 +201,6 @@ class RRT_star:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	# def cost(self, px, py, pangle, plength):          # more than 2/3 of time here and the rest of time in dubins path planner
-	# 	control_cost = 0        # NOT USED!!!!!!
-	# 	var_cost = np.zeros(len(px))
-	#
-	# 	(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = self.gmrf_params
-	#
-	# 	#iterate over path and calculate cost
-	# 	for kk in range(len(px)):      # Iterate over length of trajectory
-	# 		if not (self.space[0] <= px[kk] <= self.space[1]) or not (self.space[2] <= py[kk] <= self.space[3]):
-	# 			var_cost[kk] = Config.border_variance_penalty
-	# 			control_cost += 0
-	# 		else:
-	# 			p1 = time.time()
-	# 			A_z = Config.interpolation_matrix(np.array([px[kk], py[kk], pangle[kk]]), n, p, lx, xg_min, yg_min, de)
-	# 			self.method_time += (time.time() - p1)
-	# 			var_cost[kk] = 1/(np.dot(A_z.T, self.var_x)[0][0])
-	# 			control_cost += 0
-	# 	return np.sum(var_cost) * plength
-
 	def path_var(self, px, py, pangle):       # returns negative total variance along the path
 		control_cost = 0  # NOT USED!!!!!!
 		path_var = 0
@@ -256,7 +234,7 @@ class RRT_star:
 			plot.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
 			plot.axis(self.space)
 			plot.grid(True)
-			plot.title("RRT* (avg variance per path length as cost function)")
+			plot.title("RRT* (avg variance per unit path length as cost function)")
 			plot.pause(.1)  # need for animation
 
 def dist(node1, node2):

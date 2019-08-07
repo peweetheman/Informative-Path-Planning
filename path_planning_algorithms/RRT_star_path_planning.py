@@ -5,14 +5,14 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from control_algorithms.Node import Node
 from control_algorithms.local_planners import dubins_path_planner as plan
+from path_planning_algorithms.Node import Node
 
 
 class RRT_star:
-	# Basic RRT* algorithm using distance as dist function
+	# RRT* algorithm in x, y, theta configuration space using distance as cost function. Uses random angle steering
 
-	def __init__(self, start, goal, space, obstacles, growth=3.0, max_iter=100, max_dist=40, max_curvature=1.0, end_sample_percent=15):
+	def __init__(self, start, goal, space, obstacles, growth=3.0, max_iter=300, max_dist=40, max_curvature=1.0, end_sample_percent=15):
 		"""
 		:param start: [x,y] starting location
 		:param end: [x,y[ ending location
@@ -110,7 +110,6 @@ class RRT_star:
 		mincost = min(cost_list)
 		min_node = near_nodes[cost_list.index(mincost)]
 		if mincost == float("inf"):
-			print("no parent found")
 			# self.draw_near(near_nodes, new_node, new_node)
 			return
 		new_node.cost = mincost
@@ -165,14 +164,13 @@ class RRT_star:
 
 		for near_node in near_nodes:
 			p1 = time.time()
-			px, py, pangle, mode, plength, u = plan.dubins_path_planning(new_node.pose[0], new_node.pose[1], new_node.pose[2], near.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+			px, py, pangle, mode, plength, u = plan.dubins_path_planning(new_node.pose[0], new_node.pose[1], new_node.pose[2], near_node.pose[0], near_node.pose[1], near_node.pose[2], self.max_curvature)
 			p2 = time.time()
 			self.local_planner_time += (p2 - p1)
 			temp_cost = new_node.cost + self.cost(px, py, pangle, plength)
 			if near_node.cost > temp_cost and self.max_dist >= new_node.dist + plength \
 					and self.check_loop(near_node, new_node):
 				if self.check_collision_path(px, py):
-					print("REWIRE")
 					#self.draw_near(near_nodes, new_node, near_node)
 					near_node.parent = new_node
 					near_node.cost = temp_cost
@@ -190,10 +188,6 @@ class RRT_star:
 				if node.parent == parent_node:
 					node.cost = parent_node.cost + node.path_dist
 					node.dist = parent_node.dist + node.path_dist
-					if node.cost != node.dist:
-						print("fail")
-					else:
-						print("succeed")
 					self.propagate_update_to_children(node)
 
 	def check_loop(self, near_node, new_node):
@@ -301,7 +295,6 @@ def main():
 	plt.grid(True)
 	print("--- %s seconds ---" % (time.time() - start_time))
 	plt.show()
-
 
 if __name__ == '__main__':
 	main()
