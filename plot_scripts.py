@@ -20,7 +20,7 @@ from matplotlib.lines import Line2D
 import matplotlib.animation as animation
 
 
-def initialize_animation1(true_field, x_auv, vmin, vmax, var_min, var_max, levels, PlotField, LabelVertices):
+def initialize_animation1(true_field, vmin, vmax, var_min, var_max, levels, PlotField, LabelVertices):
 	alpha_prior = Config.alpha_prior
 	kappa_prior = Config.kappa_prior
 
@@ -71,8 +71,7 @@ def initialize_animation1(true_field, x_auv, vmin, vmax, var_min, var_max, level
 	# ax3.set_title('GMRF Hyperparameter Estimate')
 
 	plt.draw()
-	trajectory_1 = np.array(x_auv).reshape(1, 3)
-	return fig1, hyper_x, hyper_y, bottom, colors, trajectory_1
+	return fig1, hyper_x, hyper_y, bottom, colors
 
 
 def update_animation1(sampling_control, pi_theta, fig1, x, y, bottom, colors, true_field, x_auv, mue_x, var_x, params, trajectory_1, tau_x, tau_optimal, vmin, vmax, var_min, var_max, levels, PlotField, LabelVertices):

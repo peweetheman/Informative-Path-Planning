@@ -5,8 +5,8 @@ import time
 import numpy as np
 
 import Config
-from control_algorithms.local_planners import dubins_path_planner as plan
-from path_planning_algorithms.Node import Node
+from control_algorithms.base import dubins_path_planner as plan
+from control_algorithms.base.Node import Node
 
 
 class RRT_star:
@@ -116,7 +116,7 @@ class RRT_star:
 				cost_list.append(node.total_var/node.dist)
 			else:
 				cost_list.append(float("inf"))
-		print("min cost list", min(cost_list))
+		# print("min cost list", min(cost_list))
 		best_node = self.node_list[cost_list.index(min(cost_list))]
 		return best_node
 

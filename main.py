@@ -1,13 +1,9 @@
 """
-main file of PI-GMRF simulation algorithm
-
-author: Andreas Rene Geist
+orignal author: Andreas Rene Geist
 email: andreas.geist@tuhh.de
 website: https://github.com/AndReGeist
 license: BSD
-Please feel free to use and modify this, but keep the above information. Thanks!
-"""
-"""
+
 addition and modification of file by Patrick Phillips summer 2019
 email: pphill10@u.rochester.edu
 website: https://github.com/peweetheman
@@ -22,9 +18,10 @@ from gp_scripts import gp_scripts
 import plot_scripts
 from true_field import true_field
 
-for iter in range(100):
+for iter in range(Config.iterations):
 	# AUV starting state
 	x_auv = Config.x_auv
+	trajectory_1 = np.array(x_auv).reshape(1, 3)
 
 	"""Initialize Field"""
 	true_field1 = true_field(False)
@@ -34,7 +31,8 @@ for iter in range(100):
 					 "PlotField": False, "LabelVertices": True}
 
 	# Initialize plots
-	fig1, hyper_x, hyper_y, bottom, colors, trajectory_1 = plot_scripts.initialize_animation1(true_field1, x_auv, **plot_settings)
+	if Config.plot is True:
+		fig1, hyper_x, hyper_y, bottom, colors = plot_scripts.initialize_animation1(true_field1, **plot_settings)
 
 	# Initialize GMRF
 	time_1 = time.time()
@@ -48,7 +46,7 @@ for iter in range(100):
 	"""#####################################################################################"""
 	"""START SIMULATION"""
 	total_calc_time_control_script = 0
-	filename = os.path.join('data', Config.control_algo + '_runtime' + str(Config.max_runtime) + '_data' + str(iter))
+	filename = os.path.join('data', Config.control_algo + '_runtime' + str(Config.max_runtime) + '_pathlength' + str(Config.simulation_max_dist) + "_" + str(iter))
 	data = np.zeros(shape=(5, 1))
 	path_length = 0
 	myplot=None

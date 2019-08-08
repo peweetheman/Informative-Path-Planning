@@ -5,8 +5,8 @@ import time
 import numpy as np
 
 import Config
-from control_algorithms.local_planners import dubins_path_planner as plan
-from path_planning_algorithms.Node import Node
+from control_algorithms.base import dubins_path_planner as plan
+from control_algorithms.base.Node import Node
 
 
 class RRT:

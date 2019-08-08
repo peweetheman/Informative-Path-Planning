@@ -8,29 +8,43 @@ email: pphill10@u.rochester.edu
 website: https://github.com/peweetheman
 """
 
-PI_filename = os.path.join('data', 'PI_runtime0.2_data' + '0' + '.npy')
+PI_filename = os.path.join('data', 'PI_runtime0.25_pathlength40.0_' + '0' + '.npy')
 data_PI = np.load(PI_filename)
 data_PI = np.delete(data_PI, 0, 1)
 
-PRM_filename = os.path.join('data', 'PRM_star_runtime0.2_data' + '0' + '.npy')
+PRM_filename = os.path.join('data', 'PRM_star_runtime0.25_pathlength40.0_' + '1' + '.npy')
 data_PRM = np.load(PRM_filename)
 data_PRM = np.delete(data_PRM, 0, 1)
 
-for i in range(1, 30):
-	PI_filename = os.path.join('data', 'PI_runtime0.2_data' + str(i) + '.npy')
+RRT_filename = os.path.join('data', 'RRT_star_runtime0.25_pathlength40.0_' + '1' + '.npy')
+data_RRT = np.load(RRT_filename)
+data_RRT = np.delete(data_RRT, 0, 1)
+
+
+for i in range(1, 10):
+	PI_filename = os.path.join('data', 'PI_runtime0.25_pathlength40.0_' + str(i) + '.npy')
 	new_data_PI = np.load(PI_filename)
 	new_data_PI = np.delete(new_data_PI, 0, 1)
 	data_PI = np.concatenate((data_PI, new_data_PI), axis=1)
 
-	PRM_filename = os.path.join('data', 'PRM_star_runtime0.2_data' + str(i) + '.npy')
+	PRM_filename = os.path.join('data', 'PRM_star_runtime0.25_pathlength40.0_' + str(i) + '.npy')
 	new_data_PRM = np.load(PRM_filename)
 	new_data_PRM = np.delete(new_data_PRM, 0, 1)
 	data_PRM = np.concatenate((data_PRM, new_data_PRM), axis=1)
+	
+	RRT_filename = os.path.join('data', 'RRT_star_runtime0.25_pathlength40.0_' + str(i) + '.npy')
+	new_data_RRT = np.load(RRT_filename)
+	new_data_RRT = np.delete(new_data_RRT, 0, 1)
+	data_RRT = np.concatenate((data_RRT, new_data_RRT), axis=1)
+
+
+print("PI data", data_PI.shape)
+print("PRM data", data_PRM.shape)
+print("RRT data", data_RRT.shape)
 
 data_PI = data_PI[:, data_PI[0].argsort()]
 data_PRM = data_PRM[:, data_PRM[0].argsort()]
-print(data_PI.shape)
-print(data_PRM.shape)
+data_RRT = data_RRT[:, data_RRT[0].argsort()]
 
 fig1 = plt.figure(figsize=(9, 4))
 
@@ -43,10 +57,12 @@ plt.ylabel('Total Variance')
 
 f_PI = interp1d(data_PI[0, :], data_PI[1, :])
 f_PRM = interp1d(data_PRM[0, :], data_PRM[1, :])
+f_RRT = interp1d(data_RRT[0, :], data_RRT[1, :])
 
-xnew = np.linspace(1.1, 29, num=100, endpoint=True)
+xnew = np.linspace(1.1, 39, num=100, endpoint=True)
 plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
 plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
+plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
 
 handles, labels = ax0.get_legend_handles_labels()
 ax0.legend(handles[::-1], labels[::-1])
@@ -62,14 +78,15 @@ plt.ylabel('Field Variance')
 
 f_PI = interp1d(data_PI[0, :], data_PI[2, :])
 f_PRM = interp1d(data_PRM[0, :], data_PRM[2, :])
+f_RRT = interp1d(data_RRT[0, :], data_RRT[2, :])
 
-xnew = np.linspace(1.1, 29, num=100, endpoint=True)
+xnew = np.linspace(1.1, 39, num=100, endpoint=True)
 plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
 plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
+plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
 
 handles, labels = ax1.get_legend_handles_labels()
 ax1.legend(handles[::-1], labels[::-1])
-
 
 #### THIRD PLOT OF ROOT MEAN SQUARED ERROR BETWEEN GMRF APPROXIMATION AND TRUE FIELD
 ax2 = fig1.add_subplot(223)
@@ -82,10 +99,12 @@ plt.ylabel('RMSE')
 
 f_PI = interp1d(data_PI[0, :], data_PI[3, :])
 f_PRM = interp1d(data_PRM[0, :], data_PRM[3, :])
+f_RRT = interp1d(data_RRT[0, :], data_RRT[3, :])
 
-xnew = np.linspace(1.1, 29, num=100, endpoint=True)
+xnew = np.linspace(1.1, 39, num=100, endpoint=True)
 plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
 plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
+plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
 
 handles, labels = ax2.get_legend_handles_labels()
 ax2.legend(handles[::-1], labels[::-1])
