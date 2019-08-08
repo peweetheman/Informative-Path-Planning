@@ -56,8 +56,8 @@ class RRT:
 		return path, u_optimal, tau_optimal
 
 	def get_sample(self):
-		sample = Node([random.uniform(self.space[0], self.space[1]),
-					   random.uniform(self.space[2], self.space[3]),
+		sample = Node([random.uniform(self.space[0]+.3, self.space[1]-.3),
+					   random.uniform(self.space[2]+.3, self.space[3]-.3),
 					   random.uniform(-math.pi, math.pi)])
 		return sample
 
@@ -70,13 +70,13 @@ class RRT:
 		new_node = Node(source_node.pose + self.growth * vec)
 
 		if new_node.pose[0] < self.space[0]:
-			new_node.pose[0] = self.space[0] + random.uniform(0, 1)
+			new_node.pose[0] = self.space[0] + random.uniform(0, 2)
 		if new_node.pose[0] > self.space[1]:
-			new_node.pose[0] = self.space[1] - random.uniform(0, 1)
+			new_node.pose[0] = self.space[1] - random.uniform(0, 2)
 		if new_node.pose[1] < self.space[2]:
-			new_node.pose[1] = self.space[2] + random.uniform(0, 1)
+			new_node.pose[1] = self.space[2] + random.uniform(0, 2)
 		if new_node.pose[1] > self.space[3]:
-			new_node.pose[1] = self.space[3] - random.uniform(0, 1)
+			new_node.pose[1] = self.space[3] - random.uniform(0, 2)
 		return new_node
 
 	def set_parent(self, new_node, nearest_node):

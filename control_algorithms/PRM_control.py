@@ -56,8 +56,8 @@ class PRM:
 		return path, u_optimal, tau_optimal
 
 	def get_sample(self):
-		sample = Node([random.uniform(self.space[0], self.space[1]),
-					   random.uniform(self.space[2], self.space[3]),
+		sample = Node([random.uniform(self.space[0]+.3, self.space[1]-.3),
+					   random.uniform(self.space[2]+.3, self.space[3]-.3),
 					   random.uniform(-math.pi, math.pi)])
 		return sample
 
