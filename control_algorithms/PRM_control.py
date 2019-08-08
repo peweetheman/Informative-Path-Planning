@@ -2,9 +2,7 @@ import copy
 import math
 import random
 import time
-
 import numpy as np
-
 import Config
 from control_algorithms.base import dubins_path_planner as plan
 from control_algorithms.base.Node import Node
@@ -26,7 +24,7 @@ class PRM:
 		self.node_list = [self.start]
 		(self.space, self.max_time, self.max_curvature, self.min_dist, self.obstacles) = PRM_params
 		self.gmrf_params = gmrf_params
-		self.max_dist = max(max_dist, 10)   # can't just take the max_dist in case at the end of the simulation this will allow no possible paths
+		self.max_dist = max(max_dist, 10)  # can't just take the max_dist in case at the end of the simulation this will allow no possible paths
 		self.var_x = var_x
 		# used to track runtimes
 		self.local_planner_time = 0.0
@@ -39,29 +37,28 @@ class PRM:
 			current_time = time.time() - start_time
 			if current_time > self.max_time:
 				break
-			sample_node = self.get_sample()
 
+			##  PRM start
+			sample_node = self.get_sample()
 			if self.check_collision(sample_node):
-				near_nodes = self.get_near_nodes(sample_node)
-				new_node = self.set_parent(sample_node, near_nodes)
-				if new_node is None:  # no possible path from any of the near nodes
+				nearest_node = self.nearest_node(sample_node)
+				self.set_parent(sample_node, nearest_node)
+				if sample_node.parent is None:  # no possible path from any of the near nodes
 					continue
-				self.node_list.append(new_node)
-				self.rewire(new_node, near_nodes)
-			# animate added edges
-			# self.draw_graph(self.plot)
+				self.node_list.append(sample_node)
+			## PRM end
 
 		# generate path
 		last_node = self.get_best_last_node()
 		if last_node is None:
 			return None
 		path, u_optimal, tau_optimal = self.get_path(last_node)
-		return path, u_optimal, tau_optimal, self.local_planner_time, self.method_time
+		return path, u_optimal, tau_optimal
 
 	def get_sample(self):
 		sample = Node([random.uniform(self.space[0], self.space[1]),
-					  random.uniform(self.space[2], self.space[3]),
-					  random.uniform(-math.pi, math.pi)])
+					   random.uniform(self.space[2], self.space[3]),
+					   random.uniform(-math.pi, math.pi)])
 		return sample
 
 	def local_path(self, source_node, destination_node):
@@ -84,26 +81,16 @@ class PRM:
 		new_node.parent = source_node
 		return new_node
 
-	def set_parent(self, sample_node, near_nodes):
-		# connects new_node along a minimum cost path
-		if not near_nodes:
-			near_nodes.append(self.nearest_node(sample_node))
-		cost_list = []
-		for near_node in near_nodes:
-			temp_node = self.local_path(near_node, sample_node)
-			if self.check_collision(temp_node) and self.max_dist >= temp_node.dist:
-				cost_list.append(temp_node.cost)
-			else:
-				cost_list.append(float("inf"))
-
-		min_cost = min(cost_list)
-		min_node = near_nodes[cost_list.index(min_cost)]
-
-		new_node = self.local_path(min_node, sample_node)
-		if new_node.cost == float("inf"):
-			print("min cost is inf")
-			return None
-		return new_node
+	def set_parent(self, new_node, nearest_node):
+		# connects new_node to nearest node and tracks cost
+		px, py, pangle, mode, plength, u = plan.dubins_path_planning(nearest_node.pose[0], nearest_node.pose[1], nearest_node.pose[2], new_node.pose[0], new_node.pose[1], new_node.pose[2], self.max_curvature)
+		new_node.parent = nearest_node
+		new_node.path_x = px
+		new_node.path_y = py
+		new_node.path_angle = pangle
+		new_node.total_var = new_node.parent.total_var + self.path_var(px, py, pangle)
+		new_node.u = u
+		new_node.dist = new_node.parent.dist + plength
 
 	def get_best_last_node(self):
 		cost_list = []
@@ -139,32 +126,6 @@ class PRM:
 		near_nodes = [self.node_list[dlist.index(d)] for d in dlist if d <= r]
 		return near_nodes
 
-	def rewire(self, new_node, near_nodes):
-		for near_node in near_nodes:
-			temp_node = self.local_path(new_node, near_node)
-			if near_node.dist != 0:
-				if near_node.cost > temp_node.cost and self.check_collision(temp_node) \
-						and self.max_dist >= temp_node.dist and self.check_loop(near_node, new_node):
-					near_node.__dict__.update(vars(temp_node))
-					self.propagate_update_to_children(near_node)
-
-	def propagate_update_to_children(self, parent_node):
-		for node in self.node_list:
-			if node.parent is not None:
-				if node.parent == parent_node:
-					node.total_var = parent_node.total_var + node.path_var
-					node.dist = parent_node.dist + node.path_dist
-					self.propagate_update_to_children(node)
-
-	def check_loop(self, near_node, new_node):
-		# checks to make sure that changing parents to temp_node does not create a loop
-		temp = new_node.parent
-		while temp is not None:
-			if temp == near_node:
-				return False       # creates a loop
-			temp = temp.parent
-		return True                # does not create a loop
-
 	def check_collision(self, node):
 		if self.obstacles is not None:
 			for (x, y, side) in self.obstacles:
@@ -180,7 +141,7 @@ class PRM:
 		min_node = self.node_list[dlist.index(min(dlist))]
 		return min_node
 
-	def path_var(self, px, py, pangle):       # returns negative total variance along the path
+	def path_var(self, px, py, pangle):  # returns negative total variance along the path
 		control_cost = 0  # NOT USED!!!!!!
 		path_var = 0
 
@@ -197,7 +158,7 @@ class PRM:
 				control_cost += 0
 		path_var -= np.dot(A.T, self.var_x)[0][0]
 		self.method_time += (time.time() - p1)
-		return path_var    # negative path var
+		return path_var  # negative path var
 
 	def draw_graph(self, plot=None):
 		if plot is not None:  # use plot of calling
@@ -216,11 +177,13 @@ class PRM:
 			plot.title("PRM* (avg variance per unit path length as cost function)")
 			plot.pause(.1)  # need for animation
 
+
 def dist(node1, node2):
 	# returns distance between two nodes
 	return math.sqrt((node2.pose[0] - node1.pose[0]) ** 2 +
 					 (node2.pose[1] - node1.pose[1]) ** 2 +
-					 3 * min((node1.pose[2] - node2.pose[2]) ** 2, (node1.pose[2] - node2.pose[2] + 2*math.pi) ** 2, (node1.pose[2] - node2.pose[2] - 2*math.pi) ** 2))
+					 3 * min((node1.pose[2] - node2.pose[2]) ** 2, (node1.pose[2] - node2.pose[2] + 2 * math.pi) ** 2, (node1.pose[2] - node2.pose[2] - 2 * math.pi) ** 2))
+
 
 def interpolation_matrix(x_local2, n, p, lx, xg_min, yg_min, de):
 	# Calculate new observation vector through shape function interpolation
@@ -239,3 +202,30 @@ def interpolation_matrix(x_local2, n, p, lx, xg_min, yg_min, de):
 	u1[((ny + 1) * lx) + nx] = (-1 / (de[0] * de[1])) * ((x_el - de[0] / 2) * (y_el + de[1] / 2))  # u for upper left corner
 	u1[((ny + 1) * lx) + nx + 1] = (1 / (de[0] * de[1])) * ((x_el + de[0] / 2) * (y_el + de[1] / 2))  # u for upper right corner
 	return u1
+
+
+def initialize(graph, source):
+	d = {}  # Stands for destination
+	p = {}  # Stands for predecessor
+	for node in graph:
+		d[node] = float('Inf')  # We start admiting that the rest of nodes are very very far
+		p[node] = None
+	d[source] = 0  # For the source we know how to reach
+	return d, p
+
+
+def relax(node, neighbour, graph, d, p):
+	# If the distance between the node and the neighbour is lower than the one I have now
+	if d[neighbour] > d[node] + graph[node][neighbour]:
+		# Record this lower distance
+		d[neighbour] = d[node] + graph[node][neighbour]
+		p[neighbour] = node
+
+
+def bellman_ford(graph, source):
+	d, p = initialize(graph, source)
+	for i in range(len(graph) - 1):  # Run this until is converges
+		for u in graph:
+			for v in graph[u]:  # For each neighbour of u
+				relax(u, v, graph, d, p)  # Lets relax it
+	return d, p

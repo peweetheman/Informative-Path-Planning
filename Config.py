@@ -84,10 +84,10 @@ elif set_GMRF_cartype == True:
 """CONTROL PARAMETERS"""
 simulation_max_dist = 40.0   			# max distance of path for simulation tests
 iterations = 100
-control_algo = 'PI'      # choose either 'PI', 'RRT_star', 'PRM_star', 'RRT', 'PRM'
+control_algo = 'RRT'      # choose either 'PI', 'RRT_star', 'PRM_star', 'RRT', 'PRM'
 sigma_epsilon = pi / 16         # Exploration noise in radians, 90 grad = 1,57
 R_cost = 5 * np.ones(shape=(1, 1))  # Immediate control cost. This is not incorporated in sampling algorithms, though could be in the cost function.
-border_variance_penalty = 5
+border_variance_penalty = 50
 
 """Choose control parameters for PI algorithm"""
 set_sanity_check = True  # Calculates cost for the optimal path and plots the optimal path

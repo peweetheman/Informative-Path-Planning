@@ -38,10 +38,10 @@ class RRT_star:
 			if current_time > self.max_time:
 				break
 
+			# start RRT*
 			sample = self.get_sample()
 			nearest_node = self.nearest_node(sample)
 			new_node = self.steer(nearest_node, sample)
-
 			if self.check_collision(new_node.pose[0], new_node.pose[1]):
 				near_nodes = self.get_near_nodes(new_node)
 				self.set_parent(new_node, near_nodes)
@@ -49,8 +49,8 @@ class RRT_star:
 					continue
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
-		# draw added edges
-			#self.draw_graph(self.plot)
+			# end RRT*
+
 		# generate path
 		last_node = self.get_best_last_node()
 		path, u_optimal, tau_optimal = self.get_path(last_node)

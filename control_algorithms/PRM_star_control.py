@@ -39,8 +39,9 @@ class PRM_star:
 			current_time = time.time() - start_time
 			if current_time > self.max_time:
 				break
-			sample_node = self.get_sample()
 
+			# start PRM*
+			sample_node = self.get_sample()
 			if self.check_collision(sample_node):
 				near_nodes = self.get_near_nodes(sample_node)
 				new_node = self.set_parent(sample_node, near_nodes)
@@ -48,8 +49,7 @@ class PRM_star:
 					continue
 				self.node_list.append(new_node)
 				self.rewire(new_node, near_nodes)
-			# animate added edges
-			# self.draw_graph(self.plot)
+			# end PRM*
 
 		# generate path
 		last_node = self.get_best_last_node()
