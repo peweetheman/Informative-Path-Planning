@@ -18,7 +18,7 @@ from gp_scripts import gp_scripts
 import plot_scripts
 from true_field import true_field
 
-for iter in range(Config.iterations):
+for iter in range(51, Config.iterations):
 	# AUV starting state
 	x_auv = Config.x_auv
 	trajectory_1 = np.array(x_auv).reshape(1, 3)
@@ -47,6 +47,7 @@ for iter in range(Config.iterations):
 	"""START SIMULATION"""
 	total_calc_time_control_script = 0
 	filename = os.path.join('data', Config.control_algo + '_runtime' + str(Config.max_runtime) + '_pathlength' + str(Config.simulation_max_dist) + "_" + str(iter))
+	print(filename)
 	data = np.zeros(shape=(5, 1))
 	path_length = 0
 	myplot=None
