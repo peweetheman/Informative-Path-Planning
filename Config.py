@@ -82,7 +82,7 @@ elif set_GMRF_cartype == True:
 
 
 """CONTROL PARAMETERS"""
-simulation_max_dist = 30.0   			# max distance of path for simulation tests
+simulation_max_dist = 40.0   			# max distance of path for simulation tests
 iterations = 100
 control_algo = 'RRT'      # choose either 'PI', 'RRT_star', 'PRM_star', 'RRT', 'PRM'
 sigma_epsilon = pi / 16         # Exploration noise in radians, 90 grad = 1,57
@@ -99,7 +99,7 @@ t_cstep = n_horizon / N_horizon  # Control horizon step size in s
 pi_parameters = (n_updates, n_k, n_horizon, N_horizon, t_cstep, sigma_epsilon, R_cost)
 
 """Choose control parameters for sampling control algorithms"""
-max_runtime = 1.5 					# Runtime for the sampling algorithm to end after. Typically takes .05 seconds more than this runtime.
+max_runtime = 0.25 					# Runtime for the sampling algorithm to end after. Typically takes .05 seconds more than this runtime.
 max_curvature = 1.0     			# maximum curvature of a path allowed for the robot
 growth = 2.0       					# distance that RRT algorithms will steer nearest node to new node
 min_dist = 2.0                      # minimum distance of paths that the control algorithm will consider. needed to be >0 as we don't want to consider not moving (will get error if set to <=0). also good to not be super small, to discourage taking greedily very short informative paths that get stuck

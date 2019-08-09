@@ -9,9 +9,11 @@ email: pphill10@u.rochester.edu
 website: https://github.com/peweetheman
 """
 
-pathlength = "30.0"
-runtime = "1.5"
-PI, RRT, PRM, RRT_star, PRM_star = False, True, True, True, True
+interp = False     # true plots interpolation, false doesn't
+poly_fit = True		# true plots polynomial fit of data, false doesn't
+pathlength = "40.0"
+runtime = "0.25"
+PI, RRT, PRM, RRT_star, PRM_star = True, False, True, True, True
 data_PI, data_PRM, data_PRM_star, data_RRT, data_RRT_star = None, None, None, None, None
 
 if PI:
@@ -38,7 +40,7 @@ if RRT:
 
 for i in range(1, 50):
 	if PI:
-		PI_filename = os.path.join('data', 'PI_runtime' + '0.25' + '_pathlength' + pathlength + '_' + str(i+48) + '.npy')
+		PI_filename = os.path.join('data', 'PI_runtime' + '0.25' + '_pathlength' + pathlength + '_' + str(i) + '.npy')
 		new_data_PI = np.load(PI_filename)
 		new_data_PI = np.delete(new_data_PI, 0, 1)
 		data_PI = np.concatenate((data_PI, new_data_PI), axis=1)
@@ -88,23 +90,39 @@ ax0.set_title('Path length vs. Total Variance (averaged over 100 trials on rando
 plt.xlabel('Path Length (m)')
 plt.ylabel('Total Variance')
 
-if PI:
-	f_PI = interp1d(data_PI[0, :], data_PI[1, :])
-	plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
-if PRM_star:
-	f_PRM_star = interp1d(data_PRM_star[0, :], data_PRM_star[1, :])
-	plt.plot(xnew, f_PRM_star(xnew), '-', label='PRM_star interpolation')
-if RRT_star:
-	f_RRT_star = interp1d(data_RRT_star[0, :], data_RRT_star[1, :])
-	plt.plot(xnew, f_RRT_star(xnew), '-', label='RRT_star interpolation')
-	# p_RRT_star = np.poly1d(np.polyfit(data_RRT_star[0, :], data_RRT_star[1, :], 10))
-	# plt.plot(xnew, p_RRT_star(xnew), '--')
-if PRM:
-	f_PRM = interp1d(data_PRM[0, :], data_PRM[1, :])
-	plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
-if RRT:
-	f_RRT = interp1d(data_RRT[0, :], data_RRT[1, :])
-	plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
+if interp:
+	if PI:
+		f_PI = interp1d(data_PI[0, :], data_PI[1, :])
+		plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
+	if PRM_star:
+		f_PRM_star = interp1d(data_PRM_star[0, :], data_PRM_star[1, :])
+		plt.plot(xnew, f_PRM_star(xnew), '-', label='PRM* interpolation')
+	if RRT_star:
+		f_RRT_star = interp1d(data_RRT_star[0, :], data_RRT_star[1, :])
+		plt.plot(xnew, f_RRT_star(xnew), '-', label='RRT* interpolation')
+	if PRM:
+		f_PRM = interp1d(data_PRM[0, :], data_PRM[1, :])
+		plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
+	if RRT:
+		f_RRT = interp1d(data_RRT[0, :], data_RRT[1, :])
+		plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
+if poly_fit:
+	if PI:
+		p_PI = np.poly1d(np.polyfit(data_PI[0, :], data_PI[1, :], 10))
+		plt.plot(xnew, p_PI(xnew), '--', label='PI polynomial fit')
+	if PRM_star:
+		p_PRM_star = np.poly1d(np.polyfit(data_PRM_star[0, :], data_PRM_star[1, :], 10))
+		plt.plot(xnew, p_PRM_star(xnew), '--', label='PRM* polynomial fit')
+	if RRT_star:
+		p_RRT_star = np.poly1d(np.polyfit(data_RRT_star[0, :], data_RRT_star[1, :], 10))
+		plt.plot(xnew, p_RRT_star(xnew), '--', label='RRT* polynomial fit')
+	if PRM:
+		p_PRM = np.poly1d(np.polyfit(data_PRM[0, :], data_PRM[1, :], 10))
+		plt.plot(xnew, p_PRM(xnew), '--', label='PRM polynomial fit')
+	if RRT:
+		p_RRT = np.poly1d(np.polyfit(data_RRT[0, :], data_RRT[1, :], 10))
+		plt.plot(xnew, p_RRT(xnew), '--', label='RRT polynomial fit')
+
 
 handles, labels = ax0.get_legend_handles_labels()
 ax0.legend(handles[::-1], labels[::-1])
@@ -117,23 +135,39 @@ plt.ylabel('Field Variance')
 
 # plt.scatter(data_PI[0, :], data_PI[2, :], color='blue', label='PI data')
 # plt.scatter(data_PRM_star[0, :], data_PRM_star[2, :], color='yellow', label='PRM_star data')
-
-if PI:
-	f_PI = interp1d(data_PI[0, :], data_PI[2, :])
-	plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
-if PRM_star:
-	f_PRM_star = interp1d(data_PRM_star[0, :], data_PRM_star[2, :])
-	plt.plot(xnew, f_PRM_star(xnew), '-', label='PRM_star interpolation')
-if RRT_star:
-	f_RRT_star = interp1d(data_RRT_star[0, :], data_RRT_star[2, :])
-	plt.plot(xnew, f_RRT_star(xnew), '-', label='RRT_star interpolation')
-if PRM:
-	f_PRM = interp1d(data_PRM[0, :], data_PRM[2, :])
-	plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
-if RRT:
-	f_RRT = interp1d(data_RRT[0, :], data_RRT[2, :])
-	plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
-
+if interp:
+	if PI:
+		f_PI = interp1d(data_PI[0, :], data_PI[2, :])
+		plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
+	if PRM_star:
+		f_PRM_star = interp1d(data_PRM_star[0, :], data_PRM_star[2, :])
+		plt.plot(xnew, f_PRM_star(xnew), '-', label='PRM* interpolation')
+	if RRT_star:
+		f_RRT_star = interp1d(data_RRT_star[0, :], data_RRT_star[2, :])
+		plt.plot(xnew, f_RRT_star(xnew), '-', label='RRT* interpolation')
+	if PRM:
+		f_PRM = interp1d(data_PRM[0, :], data_PRM[2, :])
+		plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
+	if RRT:
+		f_RRT = interp1d(data_RRT[0, :], data_RRT[2, :])
+		plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
+if poly_fit:
+	if PI:
+		p_PI = np.poly1d(np.polyfit(data_PI[0, :], data_PI[2, :], 10))
+		plt.plot(xnew, p_PI(xnew), '--', label='PI polynomial fit')
+	if PRM_star:
+		p_PRM_star = np.poly1d(np.polyfit(data_PRM_star[0, :], data_PRM_star[2, :], 10))
+		plt.plot(xnew, p_PRM_star(xnew), '--', label='PRM* polynomial fit')
+	if RRT_star:
+		p_RRT_star = np.poly1d(np.polyfit(data_RRT_star[0, :], data_RRT_star[2, :], 10))
+		plt.plot(xnew, p_RRT_star(xnew), '--', label='RRT* polynomial fit')
+	if PRM:
+		p_PRM = np.poly1d(np.polyfit(data_PRM[0, :], data_PRM[2, :], 10))
+		plt.plot(xnew, p_PRM(xnew), '--', label='PRM polynomial fit')
+	if RRT:
+		p_RRT = np.poly1d(np.polyfit(data_RRT[0, :], data_RRT[2, :], 10))
+		plt.plot(xnew, p_RRT(xnew), '--', label='RRT polynomial fit')
+		
 handles, labels = ax1.get_legend_handles_labels()
 ax1.legend(handles[::-1], labels[::-1])
 
@@ -145,24 +179,39 @@ plt.ylabel('RMSE')
 
 # plt.scatter(data_PI[0, :], data_PI[3, :], color='blue', label='PI data')
 # plt.scatter(data_PRM_star[0, :], data_PRM_star[3, :], color='yellow', label='PRM_star data')
+if interp:
+	if PI:
+		f_PI = interp1d(data_PI[0, :], data_PI[3, :])
+		plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
+	if PRM_star:
+		f_PRM_star = interp1d(data_PRM_star[0, :], data_PRM_star[3, :])
+		plt.plot(xnew, f_PRM_star(xnew), '-', label='PRM* interpolation')
+	if RRT_star:
+		f_RRT_star = interp1d(data_RRT_star[0, :], data_RRT_star[3, :])
+		plt.plot(xnew, f_RRT_star(xnew), '-', label='RRT* interpolation')
+	if PRM:
+		f_PRM = interp1d(data_PRM[0, :], data_PRM[3, :])
+		plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
+	if RRT:
+		f_RRT = interp1d(data_RRT[0, :], data_RRT[3, :])
+		plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
+if poly_fit:
+	if PI:
+		p_PI = np.poly1d(np.polyfit(data_PI[0, :], data_PI[3, :], 10))
+		plt.plot(xnew, p_PI(xnew), '--', label='PI polynomial fit')
+	if PRM_star:
+		p_PRM_star = np.poly1d(np.polyfit(data_PRM_star[0, :], data_PRM_star[3, :], 10))
+		plt.plot(xnew, p_PRM_star(xnew), '--', label='PRM* polynomial fit')
+	if RRT_star:
+		p_RRT_star = np.poly1d(np.polyfit(data_RRT_star[0, :], data_RRT_star[3, :], 10))
+		plt.plot(xnew, p_RRT_star(xnew), '--', label='RRT* polynomial fit')
+	if PRM:
+		p_PRM = np.poly1d(np.polyfit(data_PRM[0, :], data_PRM[3, :], 10))
+		plt.plot(xnew, p_PRM(xnew), '--', label='PRM polynomial fit')
+	if RRT:
+		p_RRT = np.poly1d(np.polyfit(data_RRT[0, :], data_RRT[3, :], 10))
+		plt.plot(xnew, p_RRT(xnew), '--', label='RRT polynomial fit')
 
-if PI:
-	f_PI = interp1d(data_PI[0, :], data_PI[3, :])
-	plt.plot(xnew, f_PI(xnew), '-', label='PI interpolation')
-if PRM_star:
-	f_PRM_star = interp1d(data_PRM_star[0, :], data_PRM_star[3, :])
-	plt.plot(xnew, f_PRM_star(xnew), '-', label='PRM_star interpolation')
-if RRT_star:
-	f_RRT_star = interp1d(data_RRT_star[0, :], data_RRT_star[3, :])
-	plt.plot(xnew, f_RRT_star(xnew), '-', label='RRT_star interpolation')
-	# p_RRT_star = np.poly1d(np.polyfit(data_RRT_star[0, :], data_RRT_star[3, :], 10))
-	# plt.plot(xnew, p_RRT_star(xnew), '--')
-if PRM:
-	f_PRM = interp1d(data_PRM[0, :], data_PRM[3, :])
-	plt.plot(xnew, f_PRM(xnew), '-', label='PRM interpolation')
-if RRT:
-	f_RRT = interp1d(data_RRT[0, :], data_RRT[3, :])
-	plt.plot(xnew, f_RRT(xnew), '-', label='RRT interpolation')
 
 handles, labels = ax2.get_legend_handles_labels()
 ax2.legend(handles[::-1], labels[::-1])

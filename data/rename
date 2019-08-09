@@ -1,4 +1,4 @@
 #!/bin/bash
-for i in {0..69}; do
-    mv PI_runtime0.2_pathlength40.0_$i.npy PI_runtime0.25_pathlength40.0_$i.npy
+for i in {0..32}; do
+    mv RRT_star_runtime0.25_pathlength40_$i.npy RRT_star_runtime0.25_pathlength40.0_$i.npy
 done

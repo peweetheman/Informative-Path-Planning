@@ -18,7 +18,7 @@ from gp_scripts import gp_scripts
 import plot_scripts
 from true_field import true_field
 
-for iter in range(51, Config.iterations):
+for iter in range(18, Config.iterations):
 	# AUV starting state
 	x_auv = Config.x_auv
 	trajectory_1 = np.array(x_auv).reshape(1, 3)
