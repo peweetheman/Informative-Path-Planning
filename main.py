@@ -18,21 +18,26 @@ from gp_scripts import gp_scripts
 import plot_scripts
 from true_field import true_field
 
-for iter in range(18, Config.iterations):
+for iter in range(1, Config.iterations):
 	# AUV starting state
 	x_auv = Config.x_auv
 	trajectory_1 = np.array(x_auv).reshape(1, 3)
 
-	"""Initialize Field"""
+	# Initialize Field
 	true_field1 = true_field(False)
 	# Calculate and set plot parameters
 	plot_settings = {"vmin": np.amin(true_field1.z_field) - 0.1, "vmax": np.amax(true_field1.z_field) + 0.1, "var_min": 0,
 					 "var_max": 3, "levels": np.linspace(np.amin(true_field1.z_field) - 0.1, np.amax(true_field1.z_field) + 0.1, 20),
 					 "PlotField": False, "LabelVertices": True}
-
 	# Initialize plots
 	if Config.plot is True:
 		fig1, hyper_x, hyper_y, bottom, colors = plot_scripts.initialize_animation1(true_field1, **plot_settings)
+
+	# Initialize data collection
+	if Config.collect_data is True:
+		filename = os.path.join('data', Config.control_algo + '_runtime' + str(Config.max_runtime) + '_pathlength' + str(Config.simulation_max_dist) + "_" + str(iter))
+		print("data file: ", filename)
+		data = np.zeros(shape=(5, 1))
 
 	# Initialize GMRF
 	time_1 = time.time()
@@ -46,11 +51,8 @@ for iter in range(18, Config.iterations):
 	"""#####################################################################################"""
 	"""START SIMULATION"""
 	total_calc_time_control_script = 0
-	filename = os.path.join('data', Config.control_algo + '_runtime' + str(Config.max_runtime) + '_pathlength' + str(Config.simulation_max_dist) + "_" + str(iter))
-	print(filename)
-	data = np.zeros(shape=(5, 1))
 	path_length = 0
-	myplot=None
+	myplot = None
 	for time_in_ms in range(0, Config.simulation_end_time):  # 1200 ms
 		if time_in_ms % Config.sample_time_gmrf < 0.0000001:
 			# Compute discrete observation vector and new observation
@@ -68,12 +70,12 @@ for iter in range(18, Config.iterations):
 			# Run control algorithm to calculate new path. Select which one in Config file.
 			if Config.control_algo == 'PI':
 				u_optimal, tau_x, tau_optimal = control_scripts.pi_controller(x_auv, u_optimal, var_x, Config.pi_parameters, gmrf1.params, Config.field_dim, Config.set_sanity_check)
-				control = None
 				x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, Config.field_dim)
+				control = None
 			else:
 				control = Config.control_algorithm(start=x_auv, u_optimal=u_optimal, gmrf_params=gmrf1.params, var_x=var_x, max_dist=Config.simulation_max_dist-path_length, plot=myplot)
 				path_optimal, u_optimal, tau_optimal = control.control_algorithm()
-				x_auv = tau_optimal[:, 4]
+				x_auv = Config.auv_dynamics(x_auv, u_optimal[0], 0, Config.sample_time_gmrf / 100, Config.field_dim, tau_optimal[:, 4])
 				tau_x = None
 			trajectory_1 = np.vstack([trajectory_1, x_auv])
 			time_5 = time.time()
@@ -97,25 +99,27 @@ for iter in range(18, Config.iterations):
 			print("path_length: ", path_length)
 
 			# CODE FOR BENCHMARKING
-			(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = gmrf1.params
+			if Config.collect_data is True:
+				(lxf, lyf, dvx, dvy, lx, ly, n, p, de, l_TH, p_THETA, xg_min, xg_max, yg_min, yg_max) = gmrf1.params
 
-			# sum of variances
-			total_variance_sum = np.sum(gmrf1.var_x)
-			field_variance_sum = 0
-			for nx in range(15, 65):
-				for ny in range(15, 40):
-					field_variance_sum += gmrf1.var_x[(ny * lx) + nx]
+				# sum of variances
+				total_variance_sum = np.sum(gmrf1.var_x)
+				field_variance_sum = 0
+				for nx in range(15, 65):
+					for ny in range(15, 40):
+						field_variance_sum += gmrf1.var_x[(ny * lx) + nx]
 
-			# RMSE of mean in field bounds
-			mean_RMSE = 0
-			for nx in range(15, 65):
-				for ny in range(15, 40):
-					# print("gmrf mean x, y, z: ", de[0] * nx + xg_min, de[1] * ny + yg_min, gmrf1.mue_x[(ny * lx) + nx])
-					# print("true field mean x, y, z: ", de[0] * nx + xg_min, de[1] * ny + yg_min, true_field1.f(de[0] * nx + xg_min, de[1] * ny + yg_min))
-					mean_RMSE += (gmrf1.mue_x[(ny * lx) + nx] - true_field1.f(de[0] * nx + xg_min, de[1] * ny + yg_min)) ** 2
-			mean_RMSE = sqrt(mean_RMSE)
+				# RMSE of mean in field bounds
+				mean_RMSE = 0
+				for nx in range(15, 65):
+					for ny in range(15, 40):
+						# print("gmrf mean x, y, z: ", de[0] * nx + xg_min, de[1] * ny + yg_min, gmrf1.mue_x[(ny * lx) + nx])
+						# print("true field mean x, y, z: ", de[0] * nx + xg_min, de[1] * ny + yg_min, true_field1.f(de[0] * nx + xg_min, de[1] * ny + yg_min))
+						mean_RMSE += (gmrf1.mue_x[(ny * lx) + nx] - true_field1.f(de[0] * nx + xg_min, de[1] * ny + yg_min)) ** 2
+				mean_RMSE = sqrt(mean_RMSE)
 
-			# organize data to write to file
-			col = np.vstack((path_length, total_variance_sum, field_variance_sum, mean_RMSE, control_calc_time))
-			data = np.concatenate((data, col), axis=1)
-	np.save(filename, data)
+				# organize data to write to file
+				col = np.vstack((path_length, total_variance_sum, field_variance_sum, mean_RMSE, control_calc_time))
+				data = np.concatenate((data, col), axis=1)
+	if Config.collect_data is True:
+		np.save(filename, data)
