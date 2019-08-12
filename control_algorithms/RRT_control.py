@@ -3,7 +3,7 @@ import random
 import time
 
 import numpy as np
-
+import resource
 import Config
 from control_algorithms.base import dubins_path_planner as plan
 from control_algorithms.base.Node import Node
@@ -48,7 +48,6 @@ class RRT:
 					continue
 				self.node_list.append(new_node)
 			# RRT end
-
 		# generate path
 		last_node = self.get_best_last_node()
 		path, u_optimal, tau_optimal = self.get_path(last_node)

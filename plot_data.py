@@ -13,7 +13,7 @@ interp = False     # true plots interpolation, false doesn't
 poly_fit = True		# true plots polynomial fit of data, false doesn't
 pathlength = "40.0"
 runtime = "0.25"
-PI, RRT, PRM, RRT_star, PRM_star = True, False, True, True, True
+PI, RRT, PRM, RRT_star, PRM_star = True, True, True, True, True
 data_PI, data_PRM, data_PRM_star, data_RRT, data_RRT_star = None, None, None, None, None
 
 if PI:
@@ -38,7 +38,7 @@ if RRT:
 	data_RRT = np.delete(data_RRT, 0, 1)
 
 
-for i in range(1, 50):
+for i in range(1, 66):
 	if PI:
 		PI_filename = os.path.join('data', 'PI_runtime' + '0.25' + '_pathlength' + pathlength + '_' + str(i) + '.npy')
 		new_data_PI = np.load(PI_filename)
@@ -66,19 +66,14 @@ for i in range(1, 50):
 		data_RRT = np.concatenate((data_RRT, new_data_RRT), axis=1)
 
 if PI:
-	print("PI data", data_PI.shape)
 	data_PI = data_PI[:, data_PI[0].argsort()]
 if PRM_star:
-	print("PRM_star data", data_PRM_star.shape)
 	data_PRM_star = data_PRM_star[:, data_PRM_star[0].argsort()]
 if RRT_star:
-	print("RRT_star data", data_RRT_star.shape)
 	data_RRT_star = data_RRT_star[:, data_RRT_star[0].argsort()]
 if PRM:
-	print("PRM data", data_PRM.shape)
 	data_PRM = data_PRM[:, data_PRM[0].argsort()]
 if RRT:
-	print("RRT data", data_RRT.shape)
 	data_RRT = data_RRT[:, data_RRT[0].argsort()]
 
 fig1 = plt.figure(figsize=(9, 4))
