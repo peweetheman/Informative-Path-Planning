@@ -3,7 +3,6 @@ import random
 import time
 
 import numpy as np
-import resource
 import Config
 from control_algorithms.base import dubins_path_planner as plan
 from control_algorithms.base.Node import Node

@@ -28,8 +28,8 @@ v_auv = 1.0  # AUV velocity in meter/second (constant)
 field_dim = [0, 9.9, 0, 4.9]  # x_min , x_max, y_min, y_max
 
 # Simulation variables
-plot = False      # whether or not to plot while running
-collect_data = True
+plot = True      # whether or not to plot while running
+collect_data = False  # whether or not to save data to files
 sigma_w_squ = 0.2 ** 2  # Measurement variance
 sample_time_gmrf = 100  # Sample/Calculation time in ms of GMRF algorithm, not used right now
 simulation_end_time = 2000000 # Run time of simulation in ms, not used right now
@@ -85,7 +85,7 @@ elif set_GMRF_cartype == True:
 """CONTROL PARAMETERS"""
 simulation_max_dist = 40.0   			# max distance of path for simulation tests
 iterations = 100
-control_algo = 'RRT_star'      # choose either 'PI', 'RRT_star', 'PRM_star', 'RRT', 'PRM'
+control_algo = 'PRM_star'      # choose either 'PI', 'RRT_star', 'PRM_star', 'RRT', 'PRM'
 sigma_epsilon = pi / 16         # Exploration noise in radians, 90 grad = 1,57
 R_cost = 5 * np.ones(shape=(1, 1))  # Immediate control cost. This is not incorporated in sampling algorithms, though could be in the cost function.
 border_variance_penalty = 1000
@@ -100,7 +100,7 @@ t_cstep = n_horizon / N_horizon  # Control horizon step size in s
 pi_parameters = (n_updates, n_k, n_horizon, N_horizon, t_cstep, sigma_epsilon, R_cost)
 
 """Choose control parameters for sampling control algorithms"""
-max_runtime = 0.25					# Runtime for the sampling algorithm to end after. Typically takes .05 seconds more than this runtime.
+max_runtime = 1.5					# Runtime for the sampling algorithm to end after. Typically takes .05 seconds more than this runtime.
 max_curvature = 1.0     			# maximum curvature of a path allowed for the robot
 growth = 2.0       					# distance that RRT algorithms will steer nearest node to new node
 min_dist = 2.0                      # minimum distance of paths that the control algorithm will consider. needed to be >0 as we don't want to consider not moving (will get error if set to <=0). also good to not be super small, to discourage taking greedily very short informative paths that get stuck
