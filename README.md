@@ -10,7 +10,7 @@ The second package is the ‘data’ package. This contains the data collected o
 	     [[path_length1, path_length2…........max_path_length]
 	     [total variance1, total variance2,..total variance n]
 	     [field variance1,field variance2 ...field variance n]
-	     [RMSE1, 	RMSE2.....................RMSE n	     ]
+	     [RMSE1, 	RMSE2.....................RMSE n	 ]
 	     [calc_time 1, calc_time2.......calc_time_n         ]]
 
 The third package is called ‘gp_scripts.’ This contains the code for the Gaussian Markov Random Field (GMRF) representation of the changing estimated field. It also has the stored precision matrices used for quicker initialization. Whether these are used or precision matrices are reinitialized can be set in the Config file.
