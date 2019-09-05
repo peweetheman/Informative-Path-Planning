@@ -174,7 +174,7 @@ class PRM:
 			plot.quiver(self.start.pose[0], self.start.pose[1], math.cos(self.start.pose[2]), math.sin(self.start.pose[2]), color="b")
 			plot.axis(self.space)
 			plot.grid(True)
-			plot.title("PRM* (avg variance per unit path length as cost function)")
+			plot.title("PRM (avg variance per unit path length as cost function)")
 			plot.pause(.1)  # need for animation
 
 

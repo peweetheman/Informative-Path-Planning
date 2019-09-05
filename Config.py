@@ -85,7 +85,7 @@ elif set_GMRF_cartype == True:
 """CONTROL PARAMETERS"""
 simulation_max_dist = 40.0   			# max distance of path for simulation tests
 iterations = 100
-control_algo = 'PRM_star'      # choose either 'PI', 'RRT_star', 'PRM_star', 'RRT', 'PRM'
+control_algo = 'PRM'      # choose either 'PI', 'RRT_star', 'PRM_star', 'RRT', 'PRM'
 sigma_epsilon = pi / 16         # Exploration noise in radians, 90 grad = 1,57
 R_cost = 5 * np.ones(shape=(1, 1))  # Immediate control cost. This is not incorporated in sampling algorithms, though could be in the cost function.
 border_variance_penalty = 1000
@@ -100,7 +100,7 @@ t_cstep = n_horizon / N_horizon  # Control horizon step size in s
 pi_parameters = (n_updates, n_k, n_horizon, N_horizon, t_cstep, sigma_epsilon, R_cost)
 
 """Choose control parameters for sampling control algorithms"""
-max_runtime = 1.5					# Runtime for the sampling algorithm to end after. Typically takes .05 seconds more than this runtime.
+max_runtime = 0.5					# Runtime for the sampling algorithm to end after. Typically takes .05 seconds more than this runtime.
 max_curvature = 1.0     			# maximum curvature of a path allowed for the robot
 growth = 2.0       					# distance that RRT algorithms will steer nearest node to new node
 min_dist = 2.0                      # minimum distance of paths that the control algorithm will consider. needed to be >0 as we don't want to consider not moving (will get error if set to <=0). also good to not be super small, to discourage taking greedily very short informative paths that get stuck
@@ -130,7 +130,10 @@ def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_dim, x_auv_new=None, se
 		x_auv_out[0] = x_auv[0] + v_auv * cos(x_auv_out[2]) * delta_t
 		x_auv_out[1] = x_auv[1] + v_auv * sin(x_auv_out[2]) * delta_t
 	else:
-		x_auv_out = x_auv_new
+		print("x-auv-new", x_auv_new)
+		vec = x_auv_new - x_auv
+		unit_vec = vec/ (np.sqrt(vec[0] ** 2 + vec[1] ** 2))
+		x_auv_out = x_auv + unit_vec * 1.0
 	if set_border == True:
 		# Prevent AUV from leaving the true field
 		if x_auv_out[0] < field_dim[0]:
@@ -148,6 +151,12 @@ def auv_dynamics(x_auv, u_auv, epsilon_a, delta_t, field_dim, x_auv_new=None, se
 	if x_auv_out[2] > 2 * pi:
 		a_pi = int(x_auv_out[2] / 2 * pi)
 		x_auv_out[2] = x_auv_out[2] - a_pi * 2 * pi
+	trajectory_1 = np.vstack([x_auv, x_auv_out])
+	path_length = 0
+	for kk in range(1, np.size(trajectory_1, axis=0)):
+		path_length += ((trajectory_1[kk, 0] - trajectory_1[kk - 1, 0]) ** 2 + (
+					trajectory_1[kk, 1] - trajectory_1[kk - 1, 1]) ** 2)
+	print(" add path_length: ", path_length)
 
 	return x_auv_out
 

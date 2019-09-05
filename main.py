@@ -94,11 +94,10 @@ for iter in range(Config.iterations):
 			path_length = 0
 			for kk in range(1, np.size(trajectory_1, axis=0)):
 				path_length += ((trajectory_1[kk, 0] - trajectory_1[kk-1, 0]) ** 2 + (trajectory_1[kk, 1] - trajectory_1[kk-1, 1]) ** 2)
-			# print("path length: ", path_length)
-			if path_length >= Config.simulation_max_dist-1:
+			print("path_length: ", path_length)
+			if path_length >= Config.simulation_max_dist-.5:
 				print("END DUE TO MAX PATH LENGTH")
 				break
-			print("path_length: ", path_length)
 
 			# CODE FOR BENCHMARKING
 			if Config.collect_data is True:
