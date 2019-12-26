@@ -1,8 +1,12 @@
-Patrick Phillips
-Informative Path Planning Project
+# Informative Path Planning Project
+## Patrick Phillips
 
-This code builds off of the work by Andre Rene Geist. Its purpose is to run simulations to research and explore the effectiveness of various sampling algorithms in solving the informative path planning problem.
+#### Summary
+This code builds off of work by Andre Rene Geist, and develpoed with supervision by Daniel Deucker at the TUHH in Hamubrg, Germany. Its purpose is to run simulations to research and explore the effectiveness of various sampling algorithms in solving the informative path planning problem. The belief state of a field (e.g. a temperature distribution) is modelled using a Gaussian Markov Random Field (GMRF) which is sequentially updated with Bayesian conditioning. The paths are planned to minimize the variance of the belief state. An example run is shown in the video below. The top left panel is the true field that is trying to be learned. The top right panel is the belief state (the mean at every point in the GMRF), the bottom left panel is the variance of the GMRF along with the path that the agent has travelled. 
 
+{% include youtubePlayer.html id="Y3MEXdOezzw" %}
+
+#### Code Usage
 The directory contains 4 package folders. Alphabetically, the first is the ‘control_algorithms’ package. This package contains the 4 sampling control algorithms PRM, PRM*, RRT, and RRT* in appropriately named files ‘PRM_control.py’, PRM_star_control.py’ and so on. The package also contains a ‘random_walk_control.py’ file, and a ‘control_scripts.py’ file. The ‘control_scripts.py’ file contains the PI^2 algorithm. The ‘control_algorithms’ package also contains the ‘base’ package inside of it. Here there are several local planners and some helper classes. The local planner currently used in all of the algorithms is just the simple dubins_path_planner, which is described many places, just Google.
 
 The second package is the ‘data’ package. This contains the data collected on the performance of algorithms. New data is automatically collected and stored in this package after every run. Each file has the name of the control algorithm and then the maximum time the algorithm was allowed to run for at each iteration. The shape of the data is a numpy array as follows:
